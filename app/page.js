@@ -49,7 +49,7 @@ export default function HomePage() {
   
   // حالت‌های بازی
   const [userInput, setUserInput] = useState(Array(5).fill().map(() => Array(5).fill('')));
-  const [cellStatus, setCellStatus] = useState(Array(5).fill().map(() => Array(5).fill('empty')));
+  const [cellStatus, setCellStatus] = useState(Array(5).fill().map(() => Array(5).fill('empty'))); // empty, correct, wrong, locked
   const [score, setScore] = useState(0);
   const [mistakes, setMistakes] = useState(0);
   const [selectedCell, setSelectedCell] = useState([0, 0]);
@@ -205,53 +205,76 @@ export default function HomePage() {
     });
   };
 
-  // انتخاب خانه
+  // انتخاب خانه - فقط خانه‌های قفل نشده قابل انتخاب هستند
   const handleCellSelect = (row, col) => {
-    if (samplePuzzle.grid[row][col] === 1) {
+    if (samplePuzzle.grid[row][col] === 1 && cellStatus[row][col] !== 'locked' && !gameCompleted) {
       setSelectedCell([row, col]);
     }
   };
 
   // ورود حرف
-  // ورود حرف
-const handleInput = async (char) => {
-  if (gameCompleted || !currentUser) return;
+  const handleInput = async (char) => {
+    if (gameCompleted || !currentUser) return;
 
-  const [row, col] = selectedCell;
-  const newInput = [...userInput];
-  newInput[row][col] = char;
-  setUserInput(newInput);
+    const [row, col] = selectedCell;
+    
+    // اگر خانه قبلاً قفل شده باشد، کاری نکن
+    if (cellStatus[row][col] === 'locked') return;
 
-  // بررسی پاسخ
-  const isCorrect = char === samplePuzzle.solution[row][col];
-  const newCellStatus = [...cellStatus];
+    const newInput = [...userInput];
+    newInput[row][col] = char;
+    setUserInput(newInput);
 
-  let scoreToAdd = 0;
+    // بررسی پاسخ
+    const isCorrect = char === samplePuzzle.solution[row][col];
+    const newCellStatus = [...cellStatus];
 
-  if (isCorrect) {
-    newCellStatus[row][col] = 'correct';
-    scoreToAdd = 3;
-    const newScore = score + scoreToAdd;
-    setScore(newScore);
-  } else {
-    newCellStatus[row][col] = 'wrong';
-    const mistakeCount = mistakes + 1;
-    setMistakes(mistakeCount);
-    scoreToAdd = -mistakeCount;
-    const newScore = score + scoreToAdd;
-    setScore(newScore);
-  }
+    let scoreToAdd = 0;
 
-  setCellStatus(newCellStatus);
+    if (isCorrect) {
+      // خانه رو قفل کن
+      newCellStatus[row][col] = 'locked';
+      scoreToAdd = 3;
+      const newScore = score + scoreToAdd;
+      setScore(newScore);
+    } else {
+      newCellStatus[row][col] = 'wrong';
+      const mistakeCount = mistakes + 1;
+      setMistakes(mistakeCount);
+      scoreToAdd = -mistakeCount;
+      const newScore = score + scoreToAdd;
+      setScore(newScore);
+    }
 
-  // ذخیره امتیاز در دیتابیس فقط اگر امتیاز تغییر کرده
-  if (scoreToAdd !== 0) {
-    await updateUserScoreInDB(currentUser.id, scoreToAdd);
-  }
+    setCellStatus(newCellStatus);
 
-  // حرکت به خانه بعدی
-  moveToNextCell(row, col);
-};
+    // ذخیره امتیاز در دیتابیس فقط اگر امتیاز تغییر کرده
+    if (scoreToAdd !== 0) {
+      await updateUserScoreInDB(currentUser.id, scoreToAdd);
+    }
+
+    // حرکت به خانه بعدی (فقط اگر خانه قفل نشده باشد)
+    if (!isCorrect) {
+      moveToNextCell(row, col);
+    } else {
+      // اگر خانه قفل شد، اولین خانه قفل نشده بعدی رو پیدا کن
+      findNextUnlockedCell();
+    }
+  };
+
+  // پیدا کردن اولین خانه قفل نشده بعدی
+  const findNextUnlockedCell = () => {
+    for (let i = 0; i < samplePuzzle.size; i++) {
+      for (let j = 0; j < samplePuzzle.size; j++) {
+        if (samplePuzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
+          setSelectedCell([i, j]);
+          return;
+        }
+      }
+    }
+    // اگر همه خانه‌ها قفل شدند، بازی کامل شده
+    checkGameCompletion();
+  };
 
   // حرکت به خانه بعدی
   const moveToNextCell = (row, col) => {
@@ -264,12 +287,15 @@ const handleInput = async (char) => {
     }
 
     if (nextRow < samplePuzzle.size) {
-      while (nextRow < samplePuzzle.size && samplePuzzle.grid[nextRow][nextCol] === 0) {
+      // پیدا کردن خانه سفید و قفل نشده بعدی
+      while (nextRow < samplePuzzle.size && 
+             (samplePuzzle.grid[nextRow][nextCol] === 0 || cellStatus[nextRow][nextCol] === 'locked')) {
         nextCol++;
         if (nextCol >= samplePuzzle.size) {
           nextRow++;
           nextCol = 0;
         }
+        if (nextRow >= samplePuzzle.size) break;
       }
       
       if (nextRow < samplePuzzle.size) {
@@ -280,30 +306,29 @@ const handleInput = async (char) => {
     checkGameCompletion();
   };
 
-  // بررسی تکمیل بازی
-  // بررسی تکمیل بازی
-const checkGameCompletion = async () => {
-  let allCorrect = true;
-  
-  for (let i = 0; i < samplePuzzle.size; i++) {
-    for (let j = 0; j < samplePuzzle.size; j++) {
-      if (samplePuzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'correct') {
-        allCorrect = false;
-        break;
-      }
-    }
-    if (!allCorrect) break;
-  }
-
-  if (allComplete) {
-    const finalScore = score + 50;
-    setScore(finalScore);
-    setGameCompleted(true);
+  // بررسی تکمیل بازی - همه خانه‌ها باید قفل شده باشند
+  const checkGameCompletion = async () => {
+    let allLocked = true;
     
-    // ذخیره پاداش تکمیل بازی در دیتابیس
-    await updateUserScoreInDB(currentUser.id, 50);
-  }
-};
+    for (let i = 0; i < samplePuzzle.size; i++) {
+      for (let j = 0; j < samplePuzzle.size; j++) {
+        if (samplePuzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
+          allLocked = false;
+          break;
+        }
+      }
+      if (!allLocked) break;
+    }
+
+    if (allLocked && !gameCompleted) {
+      const finalScore = score + 50;
+      setScore(finalScore);
+      setGameCompleted(true);
+      
+      // ذخیره پاداش تکمیل بازی در دیتابیس
+      await updateUserScoreInDB(currentUser.id, 50);
+    }
+  };
 
   // صفحه کلید فارسی
   const persianKeyboard = [
@@ -464,20 +489,23 @@ const checkGameCompletion = async () => {
                     height: '60px',
                     backgroundColor: cell === 0 ? '#333' : 
                       selectedCell[0] === rowIndex && selectedCell[1] === colIndex ? '#0070f3' :
+                      cellStatus[rowIndex][colIndex] === 'locked' ? '#2E7D32' : // سبز تیره برای خانه‌های قفل شده
                       cellStatus[rowIndex][colIndex] === 'correct' ? '#4CAF50' :
                       cellStatus[rowIndex][colIndex] === 'wrong' ? '#f44336' : '#fff',
-                    border: '2px solid #ccc',
+                    border: cellStatus[rowIndex][colIndex] === 'locked' ? '2px solid #1B5E20' : '2px solid #ccc',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '20px',
                     fontWeight: 'bold',
-                    cursor: currentUser && cell === 1 ? 'pointer' : 'default',
-                    color: cellStatus[rowIndex][colIndex] === 'correct' ? '#fff' : '#000',
-                    transition: 'all 0.2s'
+                    cursor: currentUser && cell === 1 && cellStatus[rowIndex][colIndex] !== 'locked' && !gameCompleted ? 'pointer' : 'default',
+                    color: cellStatus[rowIndex][colIndex] === 'locked' || cellStatus[rowIndex][colIndex] === 'correct' ? '#fff' : '#000',
+                    transition: 'all 0.2s',
+                    opacity: cellStatus[rowIndex][colIndex] === 'locked' ? 0.8 : 1
                   }}
                 >
                   {userInput[rowIndex][colIndex]}
+                  {cellStatus[rowIndex][colIndex] === 'locked' && ' 🔒'}
                 </div>
               ))
             ))}
@@ -510,7 +538,7 @@ const checkGameCompletion = async () => {
         </div>
 
         {/* صفحه کلید - فقط برای کاربران لاگین شده */}
-        {currentUser && (
+        {currentUser && !gameCompleted && (
           <div style={{ marginBottom: '30px' }}>
             <h3>صفحه کلید</h3>
             {persianKeyboard.map((row, rowIndex) => (
@@ -529,7 +557,7 @@ const checkGameCompletion = async () => {
                       fontSize: '16px',
                       border: '1px solid #ccc',
                       backgroundColor: '#f0f0f0',
-                      cursor: gameCompleted ? 'default' : 'pointer',
+                      cursor: 'pointer',
                       borderRadius: '5px',
                       minWidth: '40px',
                       textAlign: 'center'
