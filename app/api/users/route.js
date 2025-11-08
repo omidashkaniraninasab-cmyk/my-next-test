@@ -1,22 +1,25 @@
-import { createUser } from '@/lib/db';
+import { getUsers, createUser } from '@/lib/db';
+
+export async function GET() {
+  try {
+    const users = await getUsers();
+    return Response.json(users);
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+}
 
 export async function POST(request) {
   try {
     const { name, email } = await request.json();
     
-    // کاربر را در دیتابیس ذخیره می‌کنیم
+    if (!name || !email) {
+      return Response.json({ error: 'نام و ایمیل ضروری است' }, { status: 400 });
+    }
+
     const newUser = await createUser(name, email);
-    
-    return Response.json({ 
-      success: true, 
-      user: newUser,
-      message: 'کاربر ذخیره شد' 
-    });
-    
+    return Response.json(newUser, { status: 201 });
   } catch (error) {
-    return Response.json({ 
-      success: false, 
-      error: error.message 
-    }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }
