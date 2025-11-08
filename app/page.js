@@ -213,38 +213,45 @@ export default function HomePage() {
   };
 
   // ورود حرف
-  const handleInput = async (char) => {
-    if (gameCompleted || !currentUser) return;
+  // ورود حرف
+const handleInput = async (char) => {
+  if (gameCompleted || !currentUser) return;
 
-    const [row, col] = selectedCell;
-    const newInput = [...userInput];
-    newInput[row][col] = char;
-    setUserInput(newInput);
+  const [row, col] = selectedCell;
+  const newInput = [...userInput];
+  newInput[row][col] = char;
+  setUserInput(newInput);
 
-    // بررسی پاسخ
-    const isCorrect = char === samplePuzzle.solution[row][col];
-    const newCellStatus = [...cellStatus];
+  // بررسی پاسخ
+  const isCorrect = char === samplePuzzle.solution[row][col];
+  const newCellStatus = [...cellStatus];
 
-    if (isCorrect) {
-      newCellStatus[row][col] = 'correct';
-      const newScore = score + 3;
-      setScore(newScore);
-      
-      // ذخیره امتیاز در دیتابیس
-      await updateUserScoreInDB(currentUser.id, 3);
-    } else {
-      newCellStatus[row][col] = 'wrong';
-      const mistakeCount = mistakes + 1;
-      setMistakes(mistakeCount);
-      const newScore = score - mistakeCount;
-      setScore(newScore);
-    }
+  let scoreToAdd = 0;
 
-    setCellStatus(newCellStatus);
+  if (isCorrect) {
+    newCellStatus[row][col] = 'correct';
+    scoreToAdd = 3;
+    const newScore = score + scoreToAdd;
+    setScore(newScore);
+  } else {
+    newCellStatus[row][col] = 'wrong';
+    const mistakeCount = mistakes + 1;
+    setMistakes(mistakeCount);
+    scoreToAdd = -mistakeCount;
+    const newScore = score + scoreToAdd;
+    setScore(newScore);
+  }
 
-    // حرکت به خانه بعدی
-    moveToNextCell(row, col);
-  };
+  setCellStatus(newCellStatus);
+
+  // ذخیره امتیاز در دیتابیس فقط اگر امتیاز تغییر کرده
+  if (scoreToAdd !== 0) {
+    await updateUserScoreInDB(currentUser.id, scoreToAdd);
+  }
+
+  // حرکت به خانه بعدی
+  moveToNextCell(row, col);
+};
 
   // حرکت به خانه بعدی
   const moveToNextCell = (row, col) => {
@@ -274,28 +281,29 @@ export default function HomePage() {
   };
 
   // بررسی تکمیل بازی
-  const checkGameCompletion = async () => {
-    let allCorrect = true;
-    
-    for (let i = 0; i < samplePuzzle.size; i++) {
-      for (let j = 0; j < samplePuzzle.size; j++) {
-        if (samplePuzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'correct') {
-          allCorrect = false;
-          break;
-        }
+  // بررسی تکمیل بازی
+const checkGameCompletion = async () => {
+  let allCorrect = true;
+  
+  for (let i = 0; i < samplePuzzle.size; i++) {
+    for (let j = 0; j < samplePuzzle.size; j++) {
+      if (samplePuzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'correct') {
+        allCorrect = false;
+        break;
       }
-      if (!allCorrect) break;
     }
+    if (!allCorrect) break;
+  }
 
-    if (allCorrect) {
-      const finalScore = score + 50;
-      setScore(finalScore);
-      setGameCompleted(true);
-      
-      // ذخیره پاداش تکمیل بازی در دیتابیس
-      await updateUserScoreInDB(currentUser.id, 50);
-    }
-  };
+  if (allComplete) {
+    const finalScore = score + 50;
+    setScore(finalScore);
+    setGameCompleted(true);
+    
+    // ذخیره پاداش تکمیل بازی در دیتابیس
+    await updateUserScoreInDB(currentUser.id, 50);
+  }
+};
 
   // صفحه کلید فارسی
   const persianKeyboard = [
