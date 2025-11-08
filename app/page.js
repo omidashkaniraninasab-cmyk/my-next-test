@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 
 export default function HomePage() {
-  const [isRegistered, setIsRegistered] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -13,6 +13,15 @@ export default function HomePage() {
   });
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // وقتی صفحه لود شد، کاربر لاگین شده رو از localStorage بگیر
+  useEffect(() => {
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      setCurrentUser(JSON.parse(savedUser));
+    }
+    fetchUsers();
+  }, []);
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -28,7 +37,12 @@ export default function HomePage() {
       });
 
       if (response.ok) {
-        setIsRegistered(true);
+        const newUser = await response.json();
+        
+        // کاربر رو لاگین کن و در localStorage ذخیره کن
+        setCurrentUser(newUser.user);
+        localStorage.setItem('currentUser', JSON.stringify(newUser.user));
+        
         setFormData({
           username: '',
           email: '',
@@ -44,6 +58,11 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('currentUser');
   };
 
   const fetchUsers = async () => {
@@ -78,7 +97,30 @@ export default function HomePage() {
 
   return (
     <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
-      <h1>به وبسایت کراسورد خوش آمدید! 🎯</h1>
+      {/* هدر با وضعیت کاربر */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+        <h1>به وبسایت کراسورد خوش آمدید! 🎯</h1>
+        {currentUser ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <span>👋 سلام <strong>{currentUser.first_name} {currentUser.last_name}</strong></span>
+            <button 
+              onClick={handleLogout}
+              style={{ 
+                padding: '5px 10px', 
+                backgroundColor: '#ff4444', 
+                color: 'white', 
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              خروج
+            </button>
+          </div>
+        ) : (
+          <div>👤 مهمان</div>
+        )}
+      </div>
       
       {/* آمار لحظه‌ای */}
       <div style={{ 
@@ -97,10 +139,10 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* فرم ثبت‌نام */}
-      <div style={{ marginBottom: '40px', padding: '20px', border: '1px solid #ddd', borderRadius: '10px' }}>
-        <h2>ثبت‌نام در سایت</h2>
-        {!isRegistered ? (
+      {/* فرم ثبت‌نام - فقط برای کاربران لاگین نشده نمایش داده شود */}
+      {!currentUser && (
+        <div style={{ marginBottom: '40px', padding: '20px', border: '1px solid #ddd', borderRadius: '10px' }}>
+          <h2>ثبت‌نام در سایت</h2>
           <form onSubmit={handleRegister}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
               <div>
@@ -188,15 +230,21 @@ export default function HomePage() {
                 cursor: loading ? 'not-allowed' : 'pointer'
               }}
             >
-              {loading ? 'در حال ثبت...' : 'ثبت‌نام'}
+              {loading ? 'در حال ثبت...' : 'ثبت‌نام و ورود'}
             </button>
           </form>
-        ) : (
-          <div style={{ padding: '15px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '5px' }}>
-            ✅ ثبت‌نام شما با موفقیت انجام شد!
-          </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* پیام خوش‌آمدگویی برای کاربر لاگین شده */}
+      {currentUser && (
+        <div style={{ marginBottom: '40px', padding: '20px', backgroundColor: '#e8f5e8', borderRadius: '10px' }}>
+          <h2>✅ شما با موفقیت وارد شده‌اید!</h2>
+          <p>خوش آمدید <strong>{currentUser.first_name} {currentUser.last_name}</strong></p>
+          <p>نام کاربری: <strong>{currentUser.username}</strong></p>
+          <p>ایمیل: <strong>{currentUser.email}</strong></p>
+        </div>
+      )}
 
       {/* لیست کاربران */}
       <div>
@@ -213,11 +261,12 @@ export default function HomePage() {
                 padding: '15px', 
                 border: '1px solid #ddd', 
                 borderRadius: '8px',
-                backgroundColor: '#f9f9f9'
+                backgroundColor: currentUser && user.id === currentUser.id ? '#e3f2fd' : '#f9f9f9'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                   <div>
                     <strong>👤 {user.username}</strong> - {user.first_name} {user.last_name}
+                    {currentUser && user.id === currentUser.id && <span style={{color: 'green'}}> (شما)</span>}
                     <br />
                     📧 {user.email}
                     <br />
