@@ -1,28 +1,56 @@
-import { createUserProfile, getUserProfiles } from '@/lib/db';
+import { neon } from '@neondatabase/serverless';
 
-export async function GET() {
+const sql = neon(process.env.DATABASE_URL);
+
+// ایجاد کاربر جدید در جدول user_profiles
+export async function POST(request) {
   try {
-    const users = await getUserProfiles();
-    return Response.json(users);
+    const { username, email, password, firstName, lastName, bankCardNumber } = await request.json();
+    
+    // بررسی فیلدهای ضروری
+    if (!username || !email || !password || !firstName || !lastName) {
+      return Response.json({ 
+        error: 'همه فیلدهای ضروری را پر کنید' 
+      }, { status: 400 });
+    }
+
+    // ذخیره کاربر در جدول جدید
+    const result = await sql`
+      INSERT INTO user_profiles (
+        username, email, password, first_name, last_name, bank_card_number
+      ) 
+      VALUES (
+        ${username}, ${email}, ${password}, ${firstName}, ${lastName}, ${bankCardNumber}
+      )
+      RETURNING *
+    `;
+
+    return Response.json({ 
+      success: true,
+      user: result[0]
+    }, { status: 201 });
+    
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ 
+      success: false,
+      error: error.message 
+    }, { status: 500 });
   }
 }
 
-export async function POST(request) {
+// گرفتن کاربران از جدول جدید
+export async function GET() {
   try {
-    const userData = await request.json();
+    const users = await sql`
+      SELECT * FROM user_profiles 
+      ORDER BY registration_date DESC
+    `;
     
-    const requiredFields = ['username', 'email', 'password', 'firstName', 'lastName'];
-    for (const field of requiredFields) {
-      if (!userData[field]) {
-        return Response.json({ error: `فیلد ${field} ضروری است` }, { status: 400 });
-      }
-    }
-
-    const newUser = await createUserProfile(userData);
-    return Response.json(newUser, { status: 201 });
+    return Response.json(users);
+    
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ 
+      error: error.message 
+    }, { status: 500 });
   }
 }
