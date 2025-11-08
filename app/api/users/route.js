@@ -1,8 +1,8 @@
-import { getUsers, createUser } from '@/lib/db';
+import { createUserProfile, getUserProfiles } from '@/lib/db';
 
 export async function GET() {
   try {
-    const users = await getUsers();
+    const users = await getUserProfiles();
     return Response.json(users);
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
@@ -11,13 +11,16 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    const { name, email } = await request.json();
+    const userData = await request.json();
     
-    if (!name || !email) {
-      return Response.json({ error: 'نام و ایمیل ضروری است' }, { status: 400 });
+    const requiredFields = ['username', 'email', 'password', 'firstName', 'lastName'];
+    for (const field of requiredFields) {
+      if (!userData[field]) {
+        return Response.json({ error: `فیلد ${field} ضروری است` }, { status: 400 });
+      }
     }
 
-    const newUser = await createUser(name, email);
+    const newUser = await createUserProfile(userData);
     return Response.json(newUser, { status: 201 });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
