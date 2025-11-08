@@ -66,6 +66,10 @@ export default function HomePage() {
       startNewGame(user.id);
     }
     fetchUsers();
+    
+    // آپدیت خودکار لیست کاربران هر 10 ثانیه
+    const interval = setInterval(fetchUsers, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchUserStats = async (userId) => {
@@ -122,6 +126,29 @@ export default function HomePage() {
       }
     } catch (error) {
       console.error('Error starting game:', error);
+    }
+  };
+
+  // آپدیت امتیاز کاربر در دیتابیس
+  const updateUserScoreInDB = async (userId, additionalScore) => {
+    try {
+      const response = await fetch('/api/users/update-score', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userId,
+          additionalScore: additionalScore
+        }),
+      });
+
+      if (response.ok) {
+        await fetchUserStats(userId);
+        await fetchUsers();
+      }
+    } catch (error) {
+      console.error('Error updating score:', error);
     }
   };
 
@@ -186,7 +213,7 @@ export default function HomePage() {
   };
 
   // ورود حرف
-  const handleInput = (char) => {
+  const handleInput = async (char) => {
     if (gameCompleted || !currentUser) return;
 
     const [row, col] = selectedCell;
@@ -202,6 +229,9 @@ export default function HomePage() {
       newCellStatus[row][col] = 'correct';
       const newScore = score + 3;
       setScore(newScore);
+      
+      // ذخیره امتیاز در دیتابیس
+      await updateUserScoreInDB(currentUser.id, 3);
     } else {
       newCellStatus[row][col] = 'wrong';
       const mistakeCount = mistakes + 1;
@@ -244,7 +274,7 @@ export default function HomePage() {
   };
 
   // بررسی تکمیل بازی
-  const checkGameCompletion = () => {
+  const checkGameCompletion = async () => {
     let allCorrect = true;
     
     for (let i = 0; i < samplePuzzle.size; i++) {
@@ -261,6 +291,9 @@ export default function HomePage() {
       const finalScore = score + 50;
       setScore(finalScore);
       setGameCompleted(true);
+      
+      // ذخیره پاداش تکمیل بازی در دیتابیس
+      await updateUserScoreInDB(currentUser.id, 50);
     }
   };
 
@@ -330,6 +363,42 @@ export default function HomePage() {
           <div>🎯 امتیاز کل</div>
         </div>
       </div>
+
+      {/* پروفایل کاربر لاگین شده */}
+      {currentUser && (
+        <div style={{ marginBottom: '40px', padding: '20px', border: '1px solid #ddd', borderRadius: '10px' }}>
+          <h2>👤 پروفایل کاربری - {currentUser.first_name} {currentUser.last_name}</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginTop: '20px' }}>
+            <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+              <h3>📋 اطلاعات شخصی</h3>
+              <p><strong>نام کاربری:</strong> {currentUser.username}</p>
+              <p><strong>نام و نام خانوادگی:</strong> {currentUser.first_name} {currentUser.last_name}</p>
+              <p><strong>ایمیل:</strong> {currentUser.email}</p>
+              <p><strong>تاریخ ثبت‌نام:</strong> {new Date(currentUser.registration_date).toLocaleString('fa-IR')}</p>
+              {currentUser.bank_card_number && (
+                <p><strong>شماره کارت:</strong> {currentUser.bank_card_number}</p>
+              )}
+            </div>
+            
+            <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+              <h3>🎮 اطلاعات بازی</h3>
+              <p><strong>امتیاز کل:</strong> {currentUser.total_crossword_score || 0}</p>
+              <p><strong>امتیاز امروز:</strong> {currentUser.today_crossword_score || 0}</p>
+              <p><strong>امتیاز لحظه‌ای:</strong> {currentUser.instant_crossword_score || 0}</p>
+              <p><strong>تعداد بازی‌ها:</strong> {currentUser.crossword_games_played || 0}</p>
+              <p><strong>بازی‌های کامل:</strong> {currentUser.completed_crossword_games || 0}</p>
+              <p><strong>بازی‌های ناتمام:</strong> {currentUser.incomplete_crossword_games || 0}</p>
+              <p><strong>رتبه:</strong> {currentUser.crossword_rank || 'جدید'}</p>
+            </div>
+
+            <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+              <h3>⏰ زمان‌بندی</h3>
+              <p><strong>ورود امروز:</strong> {currentUser.today_login_time ? new Date(currentUser.today_login_time).toLocaleString('fa-IR') : 'ثبت نشده'}</p>
+              <p><strong>خروج امروز:</strong> {currentUser.today_logout_time ? new Date(currentUser.today_logout_time).toLocaleString('fa-IR') : 'ثبت نشده'}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* بازی کراسورد */}
       <div style={{ marginBottom: '40px' }}>
@@ -583,7 +652,7 @@ export default function HomePage() {
       <div>
         <h2>لیست کاربران</h2>
         <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
-          🔄 به روزرسانی خودکار
+          🔄 به روزرسانی خودکار هر 10 ثانیه
         </div>
         {users.length === 0 ? (
           <p>هنوز کاربری ثبت‌نام نکرده است</p>
