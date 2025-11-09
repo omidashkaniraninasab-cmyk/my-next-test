@@ -27,9 +27,10 @@ export async function POST(request) {
     console.log('User created:', user.id);
 
     // ایجاد session برای کاربر
-    await createSession(user);
+    const sessionId = await createSession(user);
 
-    return Response.json({ 
+    // برگرداندن response با sessionId
+    return new Response(JSON.stringify({ 
       success: true,
       user: {
         id: user.id,
@@ -39,8 +40,15 @@ export async function POST(request) {
         last_name: user.last_name,
         registration_date: user.registration_date,
         bank_card_number: user.bank_card_number
+      },
+      sessionId: sessionId
+    }), {
+      status: 201,
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
       }
-    }, { status: 201 });
+    });
     
   } catch (error) {
     console.error('Register error details:', error);
