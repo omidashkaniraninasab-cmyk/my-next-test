@@ -37,23 +37,25 @@ export default function HomePage() {
   }, []);
 
   // بررسی session کاربر از سرور
-  const checkUserSession = async () => {
-    try {
-      const response = await fetch('/api/auth/session', {
-        credentials: 'include' // ارسال کوکی‌ها
-      });
-      
-      if (response.ok) {
-        const userData = await response.json();
-        if (userData.user) {
-          setCurrentUser(userData.user);
-          loadUserGameState(userData.user.id);
-        }
+ // بررسی session کاربر از سرور
+const checkUserSession = async () => {
+  try {
+    // چک کردن session از cookie
+    const sessionId = document.cookie.match(/session=([^;]+)/)?.[1];
+    
+    const response = await fetch(`/api/auth/session?sessionId=${sessionId || ''}`);
+    
+    if (response.ok) {
+      const userData = await response.json();
+      if (userData.user) {
+        setCurrentUser(userData.user);
+        loadUserGameState(userData.user.id);
       }
-    } catch (error) {
-      console.error('Error checking session:', error);
     }
-  };
+  } catch (error) {
+    console.error('Error checking session:', error);
+  }
+};
 
   // مقداردهی اولیه بازی
   const initializeGame = () => {
