@@ -1,41 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
 import ProgressChart from '../components/ProgressChart';
+import { dailyPuzzleData } from '../lib/dailyPuzzleData';
 import { PuzzleGenerator } from '../lib/puzzleGenerator';
 import { DailyPuzzle } from '../lib/dailyPuzzle';
-
-// داده نمونه برای جدول کراسورد
-const samplePuzzle = {
-  id: 1,
-  title: "جدول کراسورد",
-  size: 5,
-  grid: [
-    [1, 1, 1, 0, 1],
-    [1, 1, 1, 1, 1],
-    [1, 0, 1, 1, 1],
-    [1, 1, 1, 0, 1],
-    [1, 1, 1, 1, 1]
-  ],
-  solution: [
-    ['س', 'ا', 'ل', '', 'م'],
-    ['ع', 'ل', 'ی', 'ر', 'ض'],
-    ['ک', '', 'ت', 'ا', 'ب'],
-    ['م', 'ه', 'د', '', 'ی'],
-    ['ف', 'ا', 'ر', 'د', 'ا']
-  ],
-  across: {
-    1: { clue: "کلمه خوشامدگویی", start: [0,0], length: 3 },
-    2: { clue: "یک نام پسرانه", start: [1,0], length: 5 },
-    3: { clue: "وسیله مطالعه", start: [2,2], length: 3 },
-    4: { clue: "یک نام پسرانه", start: [3,0], length: 3 },
-    5: { clue: "یک نام دخترانه", start: [4,0], length: 5 }
-  },
-  down: {
-    1: { clue: "حرف اول فارسی", start: [0,0], length: 5 },
-    2: { clue: "وسیله نقلیه", start: [0,1], length: 5 },
-    3: { clue: "نوشیدنی", start: [0,4], length: 5 }
-  }
-};
 
 export default function HomePage() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -51,50 +19,64 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   
   // حالت‌های بازی
-  const [userInput, setUserInput] = useState(Array(5).fill().map(() => Array(5).fill('')));
-  const [cellStatus, setCellStatus] = useState(Array(5).fill().map(() => Array(5).fill('empty'))); // empty, correct, wrong, locked
+  const [userInput, setUserInput] = useState([]);
+  const [cellStatus, setCellStatus] = useState([]);
   const [score, setScore] = useState(0);
   const [mistakes, setMistakes] = useState(0);
   const [selectedCell, setSelectedCell] = useState([0, 0]);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [currentGameId, setCurrentGameId] = useState(null);
-  // بعد از stateهای موجود اضافه کن:
-const [puzzleSize, setPuzzleSize] = useState(5); // سایز پیش‌فرض
-const [availableSizes] = useState([3, 4, 5, 6, 7, 8]); // سایزهای موجود
-const [dailyPuzzle, setDailyPuzzle] = useState(null);
+  const [puzzleSize, setPuzzleSize] = useState(5);
+  const [availableSizes] = useState([3, 4, 5, 6, 7, 8]);
+  const [dailyPuzzle, setDailyPuzzle] = useState(null);
 
   // وقتی صفحه لود شد
-  // وقتی صفحه لود شد
-useEffect(() => {
-  const savedUser = localStorage.getItem('currentUser');
-  const savedPuzzle = localStorage.getItem('dailyPuzzle');
-  const savedPuzzleDate = localStorage.getItem('dailyPuzzleDate');
-  
-  const today = new Date().toISOString().split('T')[0];
-  
-  // اگر جدول امروز موجود نیست یا تاریخ عوض شده، جدول جدید ایجاد کن
-  if (!savedPuzzle || savedPuzzleDate !== today) {
-    const newPuzzle = DailyPuzzle.getDailyPuzzle();
-    setDailyPuzzle(newPuzzle);
-    localStorage.setItem('dailyPuzzle', JSON.stringify(newPuzzle));
-    localStorage.setItem('dailyPuzzleDate', today);
-  } else {
-    setDailyPuzzle(JSON.parse(savedPuzzle));
-  }
-  
-  if (savedUser) {
-    const user = JSON.parse(savedUser);
-    setCurrentUser(user);
-    fetchUserStats(user.id);
-    // بازی رو با جدول روزانه شروع کن
-    startNewGame(user.id);
-  }
-  
-  fetchUsers();
-  
-  const interval = setInterval(fetchUsers, 10000);
-  return () => clearInterval(interval);
-}, []);
+  useEffect(() => {
+    const savedUser = localStorage.getItem('currentUser');
+    const savedPuzzle = localStorage.getItem('dailyPuzzle');
+    const savedPuzzleDate = localStorage.getItem('dailyPuzzleDate');
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    // استفاده از dailyPuzzleData به عنوان جدول پیش‌فرض
+    let puzzleToUse = dailyPuzzleData;
+    
+    if (!savedPuzzle || savedPuzzleDate !== today) {
+      try {
+        const newPuzzle = DailyPuzzle.getDailyPuzzle();
+        setDailyPuzzle(newPuzzle);
+        localStorage.setItem('dailyPuzzle', JSON.stringify(newPuzzle));
+        localStorage.setItem('dailyPuzzleDate', today);
+        puzzleToUse = newPuzzle;
+      } catch (error) {
+        console.error('Error creating daily puzzle:', error);
+        // استفاده از dailyPuzzleData به عنوان fallback
+        setDailyPuzzle(dailyPuzzleData);
+        localStorage.setItem('dailyPuzzle', JSON.stringify(dailyPuzzleData));
+        localStorage.setItem('dailyPuzzleDate', today);
+      }
+    } else {
+      setDailyPuzzle(JSON.parse(savedPuzzle));
+      puzzleToUse = JSON.parse(savedPuzzle);
+    }
+    
+    // مقداردهی اولیه آرایه‌های بازی
+    const size = puzzleToUse.size;
+    setUserInput(Array(size).fill().map(() => Array(size).fill('')));
+    setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
+    
+    if (savedUser) {
+      const user = JSON.parse(savedUser);
+      setCurrentUser(user);
+      fetchUserStats(user.id);
+      startNewGame(user.id);
+    }
+    
+    fetchUsers();
+    
+    const interval = setInterval(fetchUsers, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchUserStats = async (userId) => {
     try {
@@ -123,39 +105,38 @@ useEffect(() => {
     }
   };
 
-  // شروع بازی جدید
-  // شروع بازی جدید با سایز دلخواه
-// شروع بازی جدید با جدول روزانه
-const startNewGame = async (userId) => {
-  if (!dailyPuzzle) return;
-  
-  try {
-    const response = await fetch('/api/game', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'start',
-        userId: userId,
-        gameData: { puzzle: dailyPuzzle }
-      }),
-    });
+  // شروع بازی جدید با جدول روزانه
+  const startNewGame = async (userId) => {
+    try {
+      const puzzle = dailyPuzzle || dailyPuzzleData;
+      const response = await fetch('/api/game', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'start',
+          userId: userId,
+          gameData: { puzzle: puzzle }
+        }),
+      });
 
-    if (response.ok) {
-      const data = await response.json();
-      setCurrentGameId(data.game.id);
-      setScore(0);
-      setMistakes(0);
-      setUserInput(Array(dailyPuzzle.size).fill().map(() => Array(dailyPuzzle.size).fill('')));
-      setCellStatus(Array(dailyPuzzle.size).fill().map(() => Array(dailyPuzzle.size).fill('empty')));
-      setSelectedCell([0, 0]);
-      setGameCompleted(false);
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentGameId(data.game.id);
+        setScore(0);
+        setMistakes(0);
+        
+        const size = puzzle.size;
+        setUserInput(Array(size).fill().map(() => Array(size).fill('')));
+        setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
+        setSelectedCell([0, 0]);
+        setGameCompleted(false);
+      }
+    } catch (error) {
+      console.error('Error starting game:', error);
     }
-  } catch (error) {
-    console.error('Error starting game:', error);
-  }
-};
+  };
 
   // آپدیت امتیاز کاربر در دیتابیس
   const updateUserScoreInDB = async (userId, additionalScore) => {
@@ -218,8 +199,10 @@ const startNewGame = async (userId) => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
-    setUserInput(Array(5).fill().map(() => Array(5).fill('')));
-    setCellStatus(Array(5).fill().map(() => Array(5).fill('empty')));
+    const puzzle = dailyPuzzle || dailyPuzzleData;
+    const size = puzzle.size;
+    setUserInput(Array(size).fill().map(() => Array(size).fill('')));
+    setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
     setScore(0);
     setMistakes(0);
     setSelectedCell([0, 0]);
@@ -235,7 +218,8 @@ const startNewGame = async (userId) => {
 
   // انتخاب خانه - فقط خانه‌های قفل نشده قابل انتخاب هستند
   const handleCellSelect = (row, col) => {
-    if (samplePuzzle.grid[row][col] === 1 && cellStatus[row][col] !== 'locked' && !gameCompleted) {
+    const puzzle = dailyPuzzle || dailyPuzzleData;
+    if (puzzle.grid[row][col] === 1 && cellStatus[row][col] !== 'locked' && !gameCompleted) {
       setSelectedCell([row, col]);
     }
   };
@@ -245,6 +229,7 @@ const startNewGame = async (userId) => {
     if (gameCompleted || !currentUser) return;
 
     const [row, col] = selectedCell;
+    const puzzle = dailyPuzzle || dailyPuzzleData;
     
     // اگر خانه قبلاً قفل شده باشد، کاری نکن
     if (cellStatus[row][col] === 'locked') return;
@@ -254,20 +239,19 @@ const startNewGame = async (userId) => {
     setUserInput(newInput);
 
     // بررسی پاسخ
-    const isCorrect = char === samplePuzzle.solution[row][col];
+    const isCorrect = char === puzzle.solution[row][col];
     const newCellStatus = [...cellStatus];
 
     let scoreToAdd = 0;
 
     if (isCorrect) {
-      // خانه رو قفل کن
       newCellStatus[row][col] = 'locked';
-      scoreToAdd = 3; // 3 امتیاز برای پاسخ درست
+      scoreToAdd = 3;
       const newScore = score + scoreToAdd;
       setScore(newScore);
     } else {
       newCellStatus[row][col] = 'wrong';
-      scoreToAdd = -3; // همیشه 3 امتیاز کسر برای هر اشتباه
+      scoreToAdd = -3;
       const newScore = score + scoreToAdd;
       setScore(newScore);
       setMistakes(mistakes + 1);
@@ -275,57 +259,56 @@ const startNewGame = async (userId) => {
 
     setCellStatus(newCellStatus);
 
-    // ذخیره امتیاز در دیتابیس فقط اگر امتیاز تغییر کرده
+    // ذخیره امتیاز در دیتابیس
     if (scoreToAdd !== 0) {
       await updateUserScoreInDB(currentUser.id, scoreToAdd);
     }
 
-    // حرکت به خانه بعدی (فقط اگر خانه قفل نشده باشد)
+    // حرکت به خانه بعدی
     if (!isCorrect) {
       moveToNextCell(row, col);
     } else {
-      // اگر خانه قفل شد، اولین خانه قفل نشده بعدی رو پیدا کن
       findNextUnlockedCell();
     }
   };
 
   // پیدا کردن اولین خانه قفل نشده بعدی
   const findNextUnlockedCell = () => {
-    for (let i = 0; i < samplePuzzle.size; i++) {
-      for (let j = 0; j < samplePuzzle.size; j++) {
-        if (samplePuzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
+    const puzzle = dailyPuzzle || dailyPuzzleData;
+    for (let i = 0; i < puzzle.size; i++) {
+      for (let j = 0; j < puzzle.size; j++) {
+        if (puzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
           setSelectedCell([i, j]);
           return;
         }
       }
     }
-    // اگر همه خانه‌ها قفل شدند، بازی کامل شده
     checkGameCompletion();
   };
 
   // حرکت به خانه بعدی
   const moveToNextCell = (row, col) => {
+    const puzzle = dailyPuzzle || dailyPuzzleData;
     let nextRow = row;
     let nextCol = col + 1;
 
-    if (nextCol >= samplePuzzle.size) {
+    if (nextCol >= puzzle.size) {
       nextRow++;
       nextCol = 0;
     }
 
-    if (nextRow < samplePuzzle.size) {
-      // پیدا کردن خانه سفید و قفل نشده بعدی
-      while (nextRow < samplePuzzle.size && 
-             (samplePuzzle.grid[nextRow][nextCol] === 0 || cellStatus[nextRow][nextCol] === 'locked')) {
+    if (nextRow < puzzle.size) {
+      while (nextRow < puzzle.size && 
+             (puzzle.grid[nextRow][nextCol] === 0 || cellStatus[nextRow][nextCol] === 'locked')) {
         nextCol++;
-        if (nextCol >= samplePuzzle.size) {
+        if (nextCol >= puzzle.size) {
           nextRow++;
           nextCol = 0;
         }
-        if (nextRow >= samplePuzzle.size) break;
+        if (nextRow >= puzzle.size) break;
       }
       
-      if (nextRow < samplePuzzle.size) {
+      if (nextRow < puzzle.size) {
         setSelectedCell([nextRow, nextCol]);
       }
     }
@@ -333,13 +316,14 @@ const startNewGame = async (userId) => {
     checkGameCompletion();
   };
 
-  // بررسی تکمیل بازی - همه خانه‌ها باید قفل شده باشند
+  // بررسی تکمیل بازی
   const checkGameCompletion = async () => {
+    const puzzle = dailyPuzzle || dailyPuzzleData;
     let allLocked = true;
     
-    for (let i = 0; i < samplePuzzle.size; i++) {
-      for (let j = 0; j < samplePuzzle.size; j++) {
-        if (samplePuzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
+    for (let i = 0; i < puzzle.size; i++) {
+      for (let j = 0; j < puzzle.size; j++) {
+        if (puzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
           allLocked = false;
           break;
         }
@@ -352,7 +336,6 @@ const startNewGame = async (userId) => {
       setScore(finalScore);
       setGameCompleted(true);
       
-      // ذخیره پاداش تکمیل بازی در دیتابیس
       await updateUserScoreInDB(currentUser.id, 50);
     }
   };
@@ -364,43 +347,30 @@ const startNewGame = async (userId) => {
     ['ظ', 'ط', 'ز', 'ر', 'ذ', 'د', 'پ', 'و', 'ئ']
   ];
 
+  const puzzle = dailyPuzzle || dailyPuzzleData;
+
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-      {/* هدر */}
+      {/* هدر بازی */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center', 
         marginBottom: '30px',
         padding: '15px',
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#e3f2fd',
         borderRadius: '10px'
       }}>
-        <h1 style={{ margin: 0 }}>🎯 وبسایت کراسورد</h1>
-        {currentUser ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontWeight: 'bold' }}>{currentUser.first_name} {currentUser.last_name}</div>
-              <div style={{ fontSize: '14px', color: '#666' }}>
-                🎯 امتیاز کل: {currentUser.total_crossword_score || 0}
-              </div>
-            </div>
-            <div 
-              onClick={handleLogout}
-              style={{ 
-                padding: '8px 15px', 
-                backgroundColor: '#ff4444', 
-                color: 'white', 
-                borderRadius: '5px',
-                cursor: 'pointer'
-              }}
-            >
-              خروج
-            </div>
-          </div>
-        ) : (
-          <div style={{ color: '#666' }}>👤 مهمان</div>
-        )}
+        <div>
+          <h2 style={{ margin: 0 }}>🎮 {puzzle.title}</h2>
+          <p style={{ margin: '5px 0 0 0', color: '#666' }}>
+            {currentUser ? `بازیکن: ${currentUser.first_name} ${currentUser.last_name}` : 'برای بازی ثبت‌نام کنید'}
+          </p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: '18px', fontWeight: 'bold' }}>🎯 {score} امتیاز</div>
+          <div style={{ color: '#666' }}>❌ {mistakes} اشتباه</div>
+        </div>
       </div>
 
       {/* پروفایل کاربر لاگین شده */}
@@ -439,50 +409,23 @@ const startNewGame = async (userId) => {
         </div>
       )}
 
-
-
       {/* نمودارهای پیشرفت */}
-<ProgressChart users={users} currentUser={currentUser} />
+      <ProgressChart users={users} currentUser={currentUser} />
 
-
-{/* اطلاعات جدول روزانه */}
-{dailyPuzzle && (
-  <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#e8f5e8', borderRadius: '10px' }}>
-    <h3>📅 جدول روزانه</h3>
-    <p style={{ margin: '5px 0', fontWeight: 'bold' }}>{dailyPuzzle.title}</p>
-    <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
-      سایز: {dailyPuzzle.size}×{dailyPuzzle.size} | 
-      امروز همه کاربران این جدول رو حل می‌کنند
-    </p>
-  </div>
-)}
-
-
+      {/* اطلاعات جدول روزانه */}
+      {dailyPuzzle && (
+        <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#e8f5e8', borderRadius: '10px' }}>
+          <h3>📅 جدول روزانه</h3>
+          <p style={{ margin: '5px 0', fontWeight: 'bold' }}>{dailyPuzzle.title}</p>
+          <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
+            سایز: {dailyPuzzle.size}×{dailyPuzzle.size} | 
+            امروز همه کاربران این جدول رو حل می‌کنند
+          </p>
+        </div>
+      )}
 
       {/* بازی کراسورد */}
       <div style={{ marginBottom: '40px' }}>
-        {/* هدر بازی */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '30px',
-          padding: '15px',
-          backgroundColor: '#e3f2fd',
-          borderRadius: '10px'
-        }}>
-          <div>
-            <h2 style={{ margin: 0 }}>🎮 {samplePuzzle.title}</h2>
-            <p style={{ margin: '5px 0 0 0', color: '#666' }}>
-              {currentUser ? `بازیکن: ${currentUser.first_name} ${currentUser.last_name}` : 'برای بازی ثبت‌نام کنید'}
-            </p>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '18px', fontWeight: 'bold' }}>🎯 {score} امتیاز</div>
-            <div style={{ color: '#666' }}>❌ {mistakes} اشتباه</div>
-          </div>
-        </div>
-
         {/* اگر کاربر لاگین نکرده باشد */}
         {!currentUser && (
           <div style={{ 
@@ -501,11 +444,11 @@ const startNewGame = async (userId) => {
         <div style={{ marginBottom: '40px' }}>
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: `repeat(${samplePuzzle.size}, 60px)`,
+            gridTemplateColumns: `repeat(${puzzle.size}, 60px)`,
             gap: '2px',
             marginBottom: '20px'
           }}>
-            {samplePuzzle.grid.map((row, rowIndex) => (
+            {puzzle.grid.map((row, rowIndex) => (
               row.map((cell, colIndex) => (
                 <div
                   key={`${rowIndex}-${colIndex}`}
@@ -515,23 +458,23 @@ const startNewGame = async (userId) => {
                     height: '60px',
                     backgroundColor: cell === 0 ? '#333' : 
                       selectedCell[0] === rowIndex && selectedCell[1] === colIndex ? '#0070f3' :
-                      cellStatus[rowIndex][colIndex] === 'locked' ? '#2E7D32' : // سبز تیره برای خانه‌های قفل شده
-                      cellStatus[rowIndex][colIndex] === 'correct' ? '#4CAF50' :
-                      cellStatus[rowIndex][colIndex] === 'wrong' ? '#f44336' : '#fff',
-                    border: cellStatus[rowIndex][colIndex] === 'locked' ? '2px solid #1B5E20' : '2px solid #ccc',
+                      cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '#2E7D32' :
+                      cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct' ? '#4CAF50' :
+                      cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'wrong' ? '#f44336' : '#fff',
+                    border: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '2px solid #1B5E20' : '2px solid #ccc',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '20px',
                     fontWeight: 'bold',
-                    cursor: currentUser && cell === 1 && cellStatus[rowIndex][colIndex] !== 'locked' && !gameCompleted ? 'pointer' : 'default',
-                    color: cellStatus[rowIndex][colIndex] === 'locked' || cellStatus[rowIndex][colIndex] === 'correct' ? '#fff' : '#000',
+                    cursor: currentUser && cell === 1 && cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] !== 'locked' && !gameCompleted ? 'pointer' : 'default',
+                    color: (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked') || (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct') ? '#fff' : '#000',
                     transition: 'all 0.2s',
-                    opacity: cellStatus[rowIndex][colIndex] === 'locked' ? 0.8 : 1
+                    opacity: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? 0.8 : 1
                   }}
                 >
-                  {userInput[rowIndex][colIndex]}
-                  {cellStatus[rowIndex][colIndex] === 'locked' && ' 🔒'}
+                  {userInput[rowIndex] && userInput[rowIndex][colIndex]}
+                  {cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' && ' 🔒'}
                 </div>
               ))
             ))}
@@ -546,7 +489,7 @@ const startNewGame = async (userId) => {
           }}>
             <div>
               <h3>➡️ افقی</h3>
-              {Object.entries(samplePuzzle.across).map(([num, clue]) => (
+              {Object.entries(puzzle.across).map(([num, clue]) => (
                 <p key={num} style={{ margin: '5px 0' }}>
                   <strong>{num}:</strong> {clue.clue}
                 </p>
@@ -554,63 +497,63 @@ const startNewGame = async (userId) => {
             </div>
             <div>
               <h3>⬇️ عمودی</h3>
-              {Object.entries(samplePuzzle.down).map(([num, clue]) => (
+              {Object.entries(puzzle.down).map(([num, clue]) => (
                 <p key={num} style={{ margin: '5px 0' }}>
                   <strong>{num}:</strong> {clue.clue}
                 </p>
               ))}
             </div>
           </div>
+
+          {/* صفحه کلید - فقط برای کاربران لاگین شده */}
+          {currentUser && !gameCompleted && (
+            <div style={{ marginBottom: '30px' }}>
+              <h3>صفحه کلید</h3>
+              {persianKeyboard.map((row, rowIndex) => (
+                <div key={rowIndex} style={{ 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  gap: '5px', 
+                  marginBottom: '10px' 
+                }}>
+                  {row.map(char => (
+                    <div
+                      key={char}
+                      onClick={() => handleInput(char)}
+                      style={{
+                        padding: '10px 15px',
+                        fontSize: '16px',
+                        border: '1px solid #ccc',
+                        backgroundColor: '#f0f0f0',
+                        cursor: 'pointer',
+                        borderRadius: '5px',
+                        minWidth: '40px',
+                        textAlign: 'center'
+                      }}
+                    >
+                      {char}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* پیام تکمیل بازی */}
+          {gameCompleted && (
+            <div style={{ 
+              marginTop: '15px', 
+              padding: '15px', 
+              backgroundColor: '#e8f5e8', 
+              borderRadius: '5px',
+              textAlign: 'center',
+              fontSize: '18px',
+              fontWeight: 'bold'
+            }}>
+              🎉 تبریک! بازی با موفقیت تکمیل شد! +50 امتیاز پاداش
+            </div>
+          )}
         </div>
-
-        {/* صفحه کلید - فقط برای کاربران لاگین شده */}
-        {currentUser && !gameCompleted && (
-          <div style={{ marginBottom: '30px' }}>
-            <h3>صفحه کلید</h3>
-            {persianKeyboard.map((row, rowIndex) => (
-              <div key={rowIndex} style={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
-                gap: '5px', 
-                marginBottom: '10px' 
-              }}>
-                {row.map(char => (
-                  <div
-                    key={char}
-                    onClick={() => handleInput(char)}
-                    style={{
-                      padding: '10px 15px',
-                      fontSize: '16px',
-                      border: '1px solid #ccc',
-                      backgroundColor: '#f0f0f0',
-                      cursor: 'pointer',
-                      borderRadius: '5px',
-                      minWidth: '40px',
-                      textAlign: 'center'
-                    }}
-                  >
-                    {char}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* پیام تکمیل بازی */}
-        {gameCompleted && (
-          <div style={{ 
-            marginTop: '15px', 
-            padding: '15px', 
-            backgroundColor: '#e8f5e8', 
-            borderRadius: '5px',
-            textAlign: 'center',
-            fontSize: '18px',
-            fontWeight: 'bold'
-          }}>
-            🎉 تبریک! بازی با موفقیت تکمیل شد! +50 امتیاز پاداش
-          </div>
-        )}
       </div>
 
       {/* فرم ثبت‌نام - فقط برای کاربران لاگین نشده */}
@@ -691,8 +634,8 @@ const startNewGame = async (userId) => {
               </div>
             </div>
             
-            <div 
-              onClick={handleRegister}
+            <button
+              type="submit"
               style={{ 
                 marginTop: '20px',
                 padding: '12px 30px', 
@@ -701,80 +644,82 @@ const startNewGame = async (userId) => {
                 borderRadius: '5px',
                 cursor: loading ? 'default' : 'pointer',
                 textAlign: 'center',
-                display: 'inline-block'
+                display: 'inline-block',
+                border: 'none'
               }}
+              disabled={loading}
             >
               {loading ? 'در حال ثبت...' : 'ثبت‌نام و ورود'}
-            </div>
+            </button>
           </form>
         </div>
       )}
 
-      // لیست کاربران - مرتب شده بر اساس امتیاز کل
-<div>
-  <h2>رده‌بندی کاربران</h2>
-  <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
-    🔄 به روزرسانی خودکار هر 10 ثانیه - مرتب شده بر اساس امتیاز
-  </div>
-  {users.length === 0 ? (
-    <p>هنوز کاربری ثبت‌نام نکرده است</p>
-  ) : (
-    <div style={{ display: 'grid', gap: '10px' }}>
-      {users
-        .sort((a, b) => (b.total_crossword_score || 0) - (a.total_crossword_score || 0))
-        .map((user, index) => (
-          <div key={user.id} style={{ 
-            padding: '15px', 
-            border: '1px solid #ddd', 
-            borderRadius: '8px',
-            backgroundColor: currentUser && user.id === currentUser.id ? '#e3f2fd' : '#f9f9f9',
-            borderLeft: currentUser && user.id === currentUser.id ? '4px solid #0070f3' : '1px solid #ddd'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '30px',
-                  height: '30px',
-                  backgroundColor: index === 0 ? '#FFD700' : 
-                                 index === 1 ? '#C0C0C0' : 
-                                 index === 2 ? '#CD7F32' : '#0070f3',
-                  color: 'white',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
+      {/* لیست کاربران - مرتب شده بر اساس امتیاز کل */}
+      <div>
+        <h2>رده‌بندی کاربران</h2>
+        <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
+          🔄 به روزرسانی خودکار هر 10 ثانیه - مرتب شده بر اساس امتیاز
+        </div>
+        {users.length === 0 ? (
+          <p>هنوز کاربری ثبت‌نام نکرده است</p>
+        ) : (
+          <div style={{ display: 'grid', gap: '10px' }}>
+            {users
+              .sort((a, b) => (b.total_crossword_score || 0) - (a.total_crossword_score || 0))
+              .map((user, index) => (
+                <div key={user.id} style={{ 
+                  padding: '15px', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '8px',
+                  backgroundColor: currentUser && user.id === currentUser.id ? '#e3f2fd' : '#f9f9f9',
+                  borderLeft: currentUser && user.id === currentUser.id ? '4px solid #0070f3' : '1px solid #ddd'
                 }}>
-                  {index + 1}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        width: '30px',
+                        height: '30px',
+                        backgroundColor: index === 0 ? '#FFD700' : 
+                                       index === 1 ? '#C0C0C0' : 
+                                       index === 2 ? '#CD7F32' : '#0070f3',
+                        color: 'white',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                      }}>
+                        {index + 1}
+                      </div>
+                      <div>
+                        <strong>{user.username}</strong> - {user.first_name} {user.last_name}
+                        {currentUser && user.id === currentUser.id && <span style={{color: 'green', marginRight: '10px'}}> (شما)</span>}
+                        <br />
+                        📧 {user.email}
+                        <br />
+                        🎮 بازی‌ها: {user.crossword_games_played || 0}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#0070f3' }}>
+                        🎯 {user.total_crossword_score || 0}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#666' }}>
+                        ⏰ {new Date(user.registration_date).toLocaleDateString('fa-IR')}
+                      </div>
+                      {index === 0 && <div style={{ fontSize: '12px', color: '#FFD700' }}>🥇 طلایی</div>}
+                      {index === 1 && <div style={{ fontSize: '12px', color: '#C0C0C0' }}>🥈 نقره‌ای</div>}
+                      {index === 2 && <div style={{ fontSize: '12px', color: '#CD7F32' }}>🥉 برنزی</div>}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <strong>{user.username}</strong> - {user.first_name} {user.last_name}
-                  {currentUser && user.id === currentUser.id && <span style={{color: 'green', marginRight: '10px'}}> (شما)</span>}
-                  <br />
-                  📧 {user.email}
-                  <br />
-                  🎮 بازی‌ها: {user.crossword_games_played || 0}
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#0070f3' }}>
-                  🎯 {user.total_crossword_score || 0}
-                </div>
-                <div style={{ fontSize: '12px', color: '#666' }}>
-                  ⏰ {new Date(user.registration_date).toLocaleDateString('fa-IR')}
-                </div>
-                {index === 0 && <div style={{ fontSize: '12px', color: '#FFD700' }}>🥇 طلایی</div>}
-                {index === 1 && <div style={{ fontSize: '12px', color: '#C0C0C0' }}>🥈 نقره‌ای</div>}
-                {index === 2 && <div style={{ fontSize: '12px', color: '#CD7F32' }}>🥉 برنزی</div>}
-              </div>
-            </div>
+              ))
+            }
           </div>
-        ))
-      }
-    </div>
-  )}
-</div>
+        )}
+      </div>
     </div>
   );
 }
