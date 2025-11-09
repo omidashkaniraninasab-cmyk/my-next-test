@@ -662,45 +662,71 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* لیست کاربران */}
-      <div>
-        <h2>لیست کاربران</h2>
-        <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
-          🔄 به روزرسانی خودکار هر 10 ثانیه
-        </div>
-        {users.length === 0 ? (
-          <p>هنوز کاربری ثبت‌نام نکرده است</p>
-        ) : (
-          <div style={{ display: 'grid', gap: '10px' }}>
-            {users.map(user => (
-              <div key={user.id} style={{ 
-                padding: '15px', 
-                border: '1px solid #ddd', 
-                borderRadius: '8px',
-                backgroundColor: currentUser && user.id === currentUser.id ? '#e3f2fd' : '#f9f9f9'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                  <div>
-                    <strong>👤 {user.username}</strong> - {user.first_name} {user.last_name}
-                    {currentUser && user.id === currentUser.id && <span style={{color: 'green'}}> (شما)</span>}
-                    <br />
-                    📧 {user.email}
-                    <br />
-                    🎯 امتیاز کل: <strong>{user.total_crossword_score || 0}</strong>
-                    <br />
-                    🎮 بازی‌ها: {user.crossword_games_played || 0}
-                  </div>
-                  <div style={{ textAlign: 'right', fontSize: '12px', color: '#666' }}>
-                    ⏰ {new Date(user.registration_date).toLocaleString('fa-IR')}
-                    <br />
-                    🏆 رتبه: {user.crossword_rank || 'جدید'}
-                  </div>
+      // لیست کاربران - مرتب شده بر اساس امتیاز کل
+<div>
+  <h2>رده‌بندی کاربران</h2>
+  <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
+    🔄 به روزرسانی خودکار هر 10 ثانیه - مرتب شده بر اساس امتیاز
+  </div>
+  {users.length === 0 ? (
+    <p>هنوز کاربری ثبت‌نام نکرده است</p>
+  ) : (
+    <div style={{ display: 'grid', gap: '10px' }}>
+      {users
+        .sort((a, b) => (b.total_crossword_score || 0) - (a.total_crossword_score || 0))
+        .map((user, index) => (
+          <div key={user.id} style={{ 
+            padding: '15px', 
+            border: '1px solid #ddd', 
+            borderRadius: '8px',
+            backgroundColor: currentUser && user.id === currentUser.id ? '#e3f2fd' : '#f9f9f9',
+            borderLeft: currentUser && user.id === currentUser.id ? '4px solid #0070f3' : '1px solid #ddd'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '30px',
+                  height: '30px',
+                  backgroundColor: index === 0 ? '#FFD700' : 
+                                 index === 1 ? '#C0C0C0' : 
+                                 index === 2 ? '#CD7F32' : '#0070f3',
+                  color: 'white',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}>
+                  {index + 1}
+                </div>
+                <div>
+                  <strong>{user.username}</strong> - {user.first_name} {user.last_name}
+                  {currentUser && user.id === currentUser.id && <span style={{color: 'green', marginRight: '10px'}}> (شما)</span>}
+                  <br />
+                  📧 {user.email}
+                  <br />
+                  🎮 بازی‌ها: {user.crossword_games_played || 0}
                 </div>
               </div>
-            ))}
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#0070f3' }}>
+                  🎯 {user.total_crossword_score || 0}
+                </div>
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  ⏰ {new Date(user.registration_date).toLocaleDateString('fa-IR')}
+                </div>
+                {index === 0 && <div style={{ fontSize: '12px', color: '#FFD700' }}>🥇 طلایی</div>}
+                {index === 1 && <div style={{ fontSize: '12px', color: '#C0C0C0' }}>🥈 نقره‌ای</div>}
+                {index === 2 && <div style={{ fontSize: '12px', color: '#CD7F32' }}>🥉 برنزی</div>}
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+        ))
+      }
+    </div>
+  )}
+</div>
     </div>
   );
 }
