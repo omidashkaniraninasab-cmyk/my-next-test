@@ -213,54 +213,54 @@ export default function HomePage() {
   };
 
   // ورود حرف
-  const handleInput = async (char) => {
-    if (gameCompleted || !currentUser) return;
+  // ورود حرف
+const handleInput = async (char) => {
+  if (gameCompleted || !currentUser) return;
 
-    const [row, col] = selectedCell;
-    
-    // اگر خانه قبلاً قفل شده باشد، کاری نکن
-    if (cellStatus[row][col] === 'locked') return;
+  const [row, col] = selectedCell;
+  
+  // اگر خانه قبلاً قفل شده باشد، کاری نکن
+  if (cellStatus[row][col] === 'locked') return;
 
-    const newInput = [...userInput];
-    newInput[row][col] = char;
-    setUserInput(newInput);
+  const newInput = [...userInput];
+  newInput[row][col] = char;
+  setUserInput(newInput);
 
-    // بررسی پاسخ
-    const isCorrect = char === samplePuzzle.solution[row][col];
-    const newCellStatus = [...cellStatus];
+  // بررسی پاسخ
+  const isCorrect = char === samplePuzzle.solution[row][col];
+  const newCellStatus = [...cellStatus];
 
-    let scoreToAdd = 0;
+  let scoreToAdd = 0;
 
-    if (isCorrect) {
-      // خانه رو قفل کن
-      newCellStatus[row][col] = 'locked';
-      scoreToAdd = 3;
-      const newScore = score + scoreToAdd;
-      setScore(newScore);
-    } else {
-      newCellStatus[row][col] = 'wrong';
-      const mistakeCount = mistakes + 1;
-      setMistakes(mistakeCount);
-      scoreToAdd = -mistakeCount;
-      const newScore = score + scoreToAdd;
-      setScore(newScore);
-    }
+  if (isCorrect) {
+    // خانه رو قفل کن
+    newCellStatus[row][col] = 'locked';
+    scoreToAdd = 3; // 3 امتیاز برای پاسخ درست
+    const newScore = score + scoreToAdd;
+    setScore(newScore);
+  } else {
+    newCellStatus[row][col] = 'wrong';
+    scoreToAdd = -3; // همیشه 3 امتیاز کسر برای هر اشتباه
+    const newScore = score + scoreToAdd;
+    setScore(newScore);
+    setMistakes(mistakes + 1);
+  }
 
-    setCellStatus(newCellStatus);
+  setCellStatus(newCellStatus);
 
-    // ذخیره امتیاز در دیتابیس فقط اگر امتیاز تغییر کرده
-    if (scoreToAdd !== 0) {
-      await updateUserScoreInDB(currentUser.id, scoreToAdd);
-    }
+  // ذخیره امتیاز در دیتابیس فقط اگر امتیاز تغییر کرده
+  if (scoreToAdd !== 0) {
+    await updateUserScoreInDB(currentUser.id, scoreToAdd);
+  }
 
-    // حرکت به خانه بعدی (فقط اگر خانه قفل نشده باشد)
-    if (!isCorrect) {
-      moveToNextCell(row, col);
-    } else {
-      // اگر خانه قفل شد، اولین خانه قفل نشده بعدی رو پیدا کن
-      findNextUnlockedCell();
-    }
-  };
+  // حرکت به خانه بعدی (فقط اگر خانه قفل نشده باشد)
+  if (!isCorrect) {
+    moveToNextCell(row, col);
+  } else {
+    // اگر خانه قفل شد، اولین خانه قفل نشده بعدی رو پیدا کن
+    findNextUnlockedCell();
+  }
+};
 
   // پیدا کردن اولین خانه قفل نشده بعدی
   const findNextUnlockedCell = () => {
