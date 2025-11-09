@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import ProgressChart from '../components/ProgressChart';
 import { dailyPuzzleData } from '../lib/dailyPuzzleData';
-import { PuzzleGenerator } from '../lib/puzzleGenerator';
-import { DailyPuzzle } from '../lib/dailyPuzzle';
+// import { PuzzleGenerator } from '../lib/puzzleGenerator'; // دیگر نیازی نیست
+// import { DailyPuzzle } from '../lib/dailyPuzzle'; // دیگر نیازی نیست
 
 export default function HomePage() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -26,42 +26,19 @@ export default function HomePage() {
   const [selectedCell, setSelectedCell] = useState([0, 0]);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [currentGameId, setCurrentGameId] = useState(null);
-  const [puzzleSize, setPuzzleSize] = useState(5);
-  const [availableSizes] = useState([3, 4, 5, 6, 7, 8]);
   const [dailyPuzzle, setDailyPuzzle] = useState(null);
 
   // وقتی صفحه لود شد
   useEffect(() => {
     const savedUser = localStorage.getItem('currentUser');
-    const savedPuzzle = localStorage.getItem('dailyPuzzle');
-    const savedPuzzleDate = localStorage.getItem('dailyPuzzleDate');
     
-    const today = new Date().toISOString().split('T')[0];
+    // همیشه و فقط از فایل dailyPuzzleData شما استفاده می‌کنیم
+    setDailyPuzzle(dailyPuzzleData);
+    localStorage.setItem('dailyPuzzle', JSON.stringify(dailyPuzzleData));
+    localStorage.setItem('dailyPuzzleDate', new Date().toISOString().split('T')[0]);
     
-    // استفاده از dailyPuzzleData به عنوان جدول پیش‌فرض
-    let puzzleToUse = dailyPuzzleData;
-    
-    if (!savedPuzzle || savedPuzzleDate !== today) {
-      try {
-        const newPuzzle = DailyPuzzle.getDailyPuzzle();
-        setDailyPuzzle(newPuzzle);
-        localStorage.setItem('dailyPuzzle', JSON.stringify(newPuzzle));
-        localStorage.setItem('dailyPuzzleDate', today);
-        puzzleToUse = newPuzzle;
-      } catch (error) {
-        console.error('Error creating daily puzzle:', error);
-        // استفاده از dailyPuzzleData به عنوان fallback
-        setDailyPuzzle(dailyPuzzleData);
-        localStorage.setItem('dailyPuzzle', JSON.stringify(dailyPuzzleData));
-        localStorage.setItem('dailyPuzzleDate', today);
-      }
-    } else {
-      setDailyPuzzle(JSON.parse(savedPuzzle));
-      puzzleToUse = JSON.parse(savedPuzzle);
-    }
-    
-    // مقداردهی اولیه آرایه‌های بازی
-    const size = puzzleToUse.size;
+    // مقداردهی اولیه آرایه‌های بازی بر اساس سایز فایل dailyPuzzleData
+    const size = dailyPuzzleData.size;
     setUserInput(Array(size).fill().map(() => Array(size).fill('')));
     setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
     
@@ -76,7 +53,7 @@ export default function HomePage() {
     
     const interval = setInterval(fetchUsers, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, []); // وابسته به dailyPuzzleData اگر می‌خواهید با هر تغییر خودکار آپدیت شود
 
   const fetchUserStats = async (userId) => {
     try {
@@ -108,7 +85,6 @@ export default function HomePage() {
   // شروع بازی جدید با جدول روزانه
   const startNewGame = async (userId) => {
     try {
-      const puzzle = dailyPuzzle || dailyPuzzleData;
       const response = await fetch('/api/game', {
         method: 'POST',
         headers: {
@@ -117,7 +93,7 @@ export default function HomePage() {
         body: JSON.stringify({
           action: 'start',
           userId: userId,
-          gameData: { puzzle: puzzle }
+          gameData: { puzzle: dailyPuzzleData } // استفاده از داده‌های فایل شما
         }),
       });
 
@@ -127,7 +103,8 @@ export default function HomePage() {
         setScore(0);
         setMistakes(0);
         
-        const size = puzzle.size;
+        // استفاده از سایز از فایل داده شما
+        const size = dailyPuzzleData.size;
         setUserInput(Array(size).fill().map(() => Array(size).fill('')));
         setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
         setSelectedCell([0, 0]);
@@ -199,8 +176,7 @@ export default function HomePage() {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
-    const puzzle = dailyPuzzle || dailyPuzzleData;
-    const size = puzzle.size;
+    const size = dailyPuzzleData.size;
     setUserInput(Array(size).fill().map(() => Array(size).fill('')));
     setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
     setScore(0);
@@ -218,8 +194,7 @@ export default function HomePage() {
 
   // انتخاب خانه - فقط خانه‌های قفل نشده قابل انتخاب هستند
   const handleCellSelect = (row, col) => {
-    const puzzle = dailyPuzzle || dailyPuzzleData;
-    if (puzzle.grid[row][col] === 1 && cellStatus[row][col] !== 'locked' && !gameCompleted) {
+    if (dailyPuzzleData.grid[row][col] === 1 && cellStatus[row][col] !== 'locked' && !gameCompleted) {
       setSelectedCell([row, col]);
     }
   };
@@ -229,7 +204,6 @@ export default function HomePage() {
     if (gameCompleted || !currentUser) return;
 
     const [row, col] = selectedCell;
-    const puzzle = dailyPuzzle || dailyPuzzleData;
     
     // اگر خانه قبلاً قفل شده باشد، کاری نکن
     if (cellStatus[row][col] === 'locked') return;
@@ -239,19 +213,20 @@ export default function HomePage() {
     setUserInput(newInput);
 
     // بررسی پاسخ
-    const isCorrect = char === puzzle.solution[row][col];
+    const isCorrect = char === dailyPuzzleData.solution[row][col];
     const newCellStatus = [...cellStatus];
 
     let scoreToAdd = 0;
 
     if (isCorrect) {
+      // خانه رو قفل کن
       newCellStatus[row][col] = 'locked';
-      scoreToAdd = 3;
+      scoreToAdd = 3; // 3 امتیاز برای پاسخ درست
       const newScore = score + scoreToAdd;
       setScore(newScore);
     } else {
       newCellStatus[row][col] = 'wrong';
-      scoreToAdd = -3;
+      scoreToAdd = -3; // همیشه 3 امتیاز کسر برای هر اشتباه
       const newScore = score + scoreToAdd;
       setScore(newScore);
       setMistakes(mistakes + 1);
@@ -259,56 +234,57 @@ export default function HomePage() {
 
     setCellStatus(newCellStatus);
 
-    // ذخیره امتیاز در دیتابیس
+    // ذخیره امتیاز در دیتابیس فقط اگر امتیاز تغییر کرده
     if (scoreToAdd !== 0) {
       await updateUserScoreInDB(currentUser.id, scoreToAdd);
     }
 
-    // حرکت به خانه بعدی
+    // حرکت به خانه بعدی (فقط اگر خانه قفل نشده باشد)
     if (!isCorrect) {
       moveToNextCell(row, col);
     } else {
+      // اگر خانه قفل شد، اولین خانه قفل نشده بعدی رو پیدا کن
       findNextUnlockedCell();
     }
   };
 
   // پیدا کردن اولین خانه قفل نشده بعدی
   const findNextUnlockedCell = () => {
-    const puzzle = dailyPuzzle || dailyPuzzleData;
-    for (let i = 0; i < puzzle.size; i++) {
-      for (let j = 0; j < puzzle.size; j++) {
-        if (puzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
+    for (let i = 0; i < dailyPuzzleData.size; i++) {
+      for (let j = 0; j < dailyPuzzleData.size; j++) {
+        if (dailyPuzzleData.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
           setSelectedCell([i, j]);
           return;
         }
       }
     }
+    // اگر همه خانه‌ها قفل شدند، بازی کامل شده
     checkGameCompletion();
   };
 
   // حرکت به خانه بعدی
   const moveToNextCell = (row, col) => {
-    const puzzle = dailyPuzzle || dailyPuzzleData;
     let nextRow = row;
     let nextCol = col + 1;
 
-    if (nextCol >= puzzle.size) {
+    if (nextCol >= dailyPuzzleData.size) {
       nextRow++;
       nextCol = 0;
     }
 
-    if (nextRow < puzzle.size) {
-      while (nextRow < puzzle.size && 
-             (puzzle.grid[nextRow][nextCol] === 0 || cellStatus[nextRow][nextCol] === 'locked')) {
-        nextCol++;
-        if (nextCol >= puzzle.size) {
+    if (nextRow < dailyPuzzleData.size) {
+      // پیدا کردن خانه سفید و قفل نشده بعدی
+      while (nextRow < dailyPuzzleData.size && 
+             (dailyPuzzleData.grid[nextRow][nextCol] === 0 || cellStatus[nextRow][nextCol] === 'locked')) {
+      nextCol++;
+        if (nextCol >= dailyPuzzleData.size) {
           nextRow++;
           nextCol = 0;
         }
-        if (nextRow >= puzzle.size) break;
+         if (nextRow >= dailyPuzzleData.size) break;
       }
       
-      if (nextRow < puzzle.size) {
+      if (nextRow < dailyPuzzleData.size) {
         setSelectedCell([nextRow, nextCol]);
       }
     }
@@ -316,14 +292,13 @@ export default function HomePage() {
     checkGameCompletion();
   };
 
-  // بررسی تکمیل بازی
+  // بررسی تکمیل بازی - همه خانه‌ها باید قفل شده باشند
   const checkGameCompletion = async () => {
-    const puzzle = dailyPuzzle || dailyPuzzleData;
     let allLocked = true;
     
-    for (let i = 0; i < puzzle.size; i++) {
-      for (let j = 0; j < puzzle.size; j++) {
-        if (puzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
+    for (let i = 0; i < dailyPuzzleData.size; i++) {
+      for (let j = 0; j < dailyPuzzleData.size; j++) {
+        if (dailyPuzzleData.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
           allLocked = false;
           break;
         }
@@ -336,6 +311,7 @@ export default function HomePage() {
       setScore(finalScore);
       setGameCompleted(true);
       
+      // ذخیره پاداش تکمیل بازی در دیتابیس
       await updateUserScoreInDB(currentUser.id, 50);
     }
   };
@@ -347,7 +323,8 @@ export default function HomePage() {
     ['ظ', 'ط', 'ز', 'ر', 'ذ', 'د', 'پ', 'و', 'ئ']
   ];
 
-  const puzzle = dailyPuzzle || dailyPuzzleData;
+  // استفاده از dailyPuzzleData به عنوان منبع اصلی
+  const puzzle = dailyPuzzleData;
 
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -419,7 +396,7 @@ export default function HomePage() {
           <p style={{ margin: '5px 0', fontWeight: 'bold' }}>{dailyPuzzle.title}</p>
           <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
             سایز: {dailyPuzzle.size}×{dailyPuzzle.size} | 
-            امروز همه کاربران این جدول رو حل می‌کنند
+            تاریخ: {dailyPuzzle.date}
           </p>
         </div>
       )}
