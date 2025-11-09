@@ -8,16 +8,22 @@ export async function POST(request) {
     
     console.log('Updating score for user:', userId, 'Additional score:', additionalScore);
     
+    if (!userId) {
+      return Response.json({ error: 'User ID required' }, { status: 400 });
+    }
+
     // آپدیت همزمان امتیاز امروز و امتیاز کل
     await sql`
       UPDATE user_profiles 
       SET 
-        today_crossword_score = today_crossword_score + ${additionalScore},
-        total_crossword_score = total_crossword_score + ${additionalScore},
+        today_crossword_score = COALESCE(today_crossword_score, 0) + ${additionalScore},
+        total_crossword_score = COALESCE(total_crossword_score, 0) + ${additionalScore},
         instant_crossword_score = ${additionalScore},
-        crossword_games_played = crossword_games_played + 1
+        crossword_games_played = COALESCE(crossword_games_played, 0) + 1
       WHERE id = ${userId}
     `;
+
+    console.log('✅ Score updated successfully');
 
     return Response.json({ success: true });
     

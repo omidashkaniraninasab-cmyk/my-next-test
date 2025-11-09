@@ -120,19 +120,32 @@ const loadUserGameState = async (userId) => {
 };
 
   const fetchUserStats = async (userId) => {
-    try {
-      const response = await fetch('/api/users');
-      if (response.ok) {
-        const userData = await response.json();
-        const currentUserData = userData.find(user => user.id === userId);
-        if (currentUserData) {
-          setCurrentUser(currentUserData);
-        }
+  try {
+    console.log('🔄 Fetching user stats for:', userId);
+    
+    const response = await fetch('/api/users');
+    if (response.ok) {
+      const userData = await response.json();
+      const currentUserData = userData.find(user => user.id === userId);
+      
+      if (currentUserData) {
+        console.log('📊 User stats loaded:', {
+          total: currentUserData.total_crossword_score,
+          today: currentUserData.today_crossword_score,
+          games: currentUserData.crossword_games_played
+        });
+        
+        setCurrentUser(currentUserData);
+      } else {
+        console.log('❌ User not found in user list');
       }
-    } catch (error) {
-      console.error('Error:', error);
+    } else {
+      console.error('❌ Error fetching users:', response.status);
     }
-  };
+  } catch (error) {
+    console.error('❌ Error:', error);
+  }
+};
 
   const fetchUsers = async () => {
     try {
