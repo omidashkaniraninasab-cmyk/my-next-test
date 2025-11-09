@@ -66,28 +66,41 @@ const checkUserSession = async () => {
   };
 
   // لود وضعیت بازی کاربر از سرور
-  const loadUserGameState = async (userId) => {
-    try {
-      const response = await fetch(`/api/game/state?userId=${userId}`);
-      if (response.ok) {
-        const gameState = await response.json();
-        if (gameState && gameState.userProgress) {
-          setUserInput(gameState.userProgress.userInput || []);
-          setCellStatus(gameState.userProgress.cellStatus || []);
-          setScore(gameState.score || 0);
-          setMistakes(gameState.mistakes || 0);
-          setSelectedCell(gameState.userProgress.selectedCell || [0, 0]);
-          setGameCompleted(gameState.completed || false);
-          setCurrentGameId(gameState.id);
-        } else {
-          // اگر بازی فعالی نداره، بازی جدید شروع کن
-          startNewGame(userId);
-        }
+  // لود وضعیت بازی کاربر از سرور
+const loadUserGameState = async (userId) => {
+  try {
+    console.log('🔄 Loading game state for user:', userId);
+    
+    const response = await fetch(`/api/game/state?userId=${userId}`);
+    
+    if (response.ok) {
+      const gameState = await response.json();
+      console.log('📦 Game state response:', gameState);
+      
+      if (gameState && gameState.userProgress) {
+        console.log('✅ Setting game state from server');
+        
+        setUserInput(gameState.userProgress.userInput || []);
+        setCellStatus(gameState.userProgress.cellStatus || []);
+        setScore(gameState.score || 0);
+        setMistakes(gameState.mistakes || 0);
+        setSelectedCell(gameState.userProgress.selectedCell || [0, 0]);
+        setGameCompleted(gameState.completed || false);
+        setCurrentGameId(gameState.id);
+        
+        console.log('🎮 Game state loaded successfully');
+      } else {
+        console.log('🆕 No active game found, starting new game');
+        // اگر بازی فعالی نداره، بازی جدید شروع کن
+        startNewGame(userId);
       }
-    } catch (error) {
-      console.error('Error loading game state:', error);
+    } else {
+      console.error('❌ Error loading game state:', response.status);
     }
-  };
+  } catch (error) {
+    console.error('❌ Error loading game state:', error);
+  }
+};
 
   const fetchUserStats = async (userId) => {
     try {

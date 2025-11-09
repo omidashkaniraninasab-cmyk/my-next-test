@@ -7,6 +7,8 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
+    console.log('Loading game state for user:', userId);
+
     if (!userId) {
       return Response.json({ error: 'User ID required' }, { status: 400 });
     }
@@ -19,6 +21,8 @@ export async function GET(request) {
       LIMIT 1
     `;
 
+    console.log('Found games:', games.length);
+
     if (games.length === 0) {
       return Response.json({ 
         activeGame: false,
@@ -27,6 +31,11 @@ export async function GET(request) {
     }
 
     const game = games[0];
+    console.log('Game state loaded:', { 
+      id: game.id, 
+      score: game.score,
+      completed: game.completed 
+    });
     
     return Response.json({
       id: game.id,
@@ -38,6 +47,7 @@ export async function GET(request) {
     });
     
   } catch (error) {
+    console.error('Game state error:', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
 }
