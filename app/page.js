@@ -116,35 +116,37 @@ export default function HomePage() {
 
   // شروع بازی جدید با جدول روزانه
   const startNewGame = async (userId) => {
-    try {
-      const response = await fetch('/api/game', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'start',
-          userId: userId,
-          gameData: { puzzle: dailyPuzzleData }
-        }),
-      });
+  try {
+    console.log('🔵 startNewGame called with userId:', userId);
+    
+    const response = await fetch('/api/game', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'start',
+        userId: userId,
+        gameData: { puzzle: dailyPuzzleData }
+      }),
+    });
 
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentGameId(data.game.id);
-        setScore(0);
-        setMistakes(0);
-        
-        const size = dailyPuzzleData.size;
-        setUserInput(Array(size).fill().map(() => Array(size).fill('')));
-        setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
-        setSelectedCell([0, 0]);
-        setGameCompleted(false);
-      }
-    } catch (error) {
-      console.error('Error starting game:', error);
+    console.log('🔵 Game API response status:', response.status);
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Game started successfully:', data);
+      
+      setCurrentGameId(data.game.id);
+      // بقیه کد...
+    } else {
+      const errorData = await response.json();
+      console.error('❌ Game API error:', errorData);
     }
-  };
+  } catch (error) {
+    console.error('❌ Error starting game:', error);
+  }
+};
 
   // آپدیت امتیاز کاربر در دیتابیس
   const updateUserScoreInDB = async (userId, additionalScore) => {
@@ -170,35 +172,47 @@ export default function HomePage() {
   };
 
   const handleRegister = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(formData),
-      });
+  e.preventDefault();
+  setLoading(true);
+  
+  try {
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(formData),
+    });
 
-      if (response.ok) {
-        const result = await response.json();
-        setCurrentUser(result.user);
-        setFormData({
-          username: '', email: '', password: '',
-          firstName: '', lastName: '', bankCardNumber: ''
-        });
-        await fetchUsers();
+    if (response.ok) {
+      const result = await response.json();
+      console.log('Registration successful:', result);
+      
+      setCurrentUser(result.user);
+      setFormData({
+        username: '', email: '', password: '',
+        firstName: '', lastName: '', bankCardNumber: ''
+      });
+      
+      await fetchUsers();
+      
+      // منتظر موندن و سپس شروع بازی جدید
+      setTimeout(() => {
+        console.log('Starting new game after registration...');
         startNewGame(result.user.id);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
+      }, 1000);
+      
+    } else {
+      const errorData = await response.json();
+      console.error('Registration failed:', errorData);
     }
-  };
+  } catch (error) {
+    console.error('Error:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleLogout = async () => {
     try {
