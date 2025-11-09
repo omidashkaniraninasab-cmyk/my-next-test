@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import ProgressChart from '../components/ProgressChart';
 import { PuzzleGenerator } from '../lib/puzzleGenerator';
+import { DailyPuzzle } from '../lib/dailyPuzzle';
 
 // داده نمونه برای جدول کراسورد
 const samplePuzzle = {
@@ -60,22 +61,40 @@ export default function HomePage() {
   // بعد از stateهای موجود اضافه کن:
 const [puzzleSize, setPuzzleSize] = useState(5); // سایز پیش‌فرض
 const [availableSizes] = useState([3, 4, 5, 6, 7, 8]); // سایزهای موجود
+const [dailyPuzzle, setDailyPuzzle] = useState(null);
 
   // وقتی صفحه لود شد
-  useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      const user = JSON.parse(savedUser);
-      setCurrentUser(user);
-      fetchUserStats(user.id);
-      startNewGame(user.id);
-    }
-    fetchUsers();
-    
-    // آپدیت خودکار لیست کاربران هر 10 ثانیه
-    const interval = setInterval(fetchUsers, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  // وقتی صفحه لود شد
+useEffect(() => {
+  const savedUser = localStorage.getItem('currentUser');
+  const savedPuzzle = localStorage.getItem('dailyPuzzle');
+  const savedPuzzleDate = localStorage.getItem('dailyPuzzleDate');
+  
+  const today = new Date().toISOString().split('T')[0];
+  
+  // اگر جدول امروز موجود نیست یا تاریخ عوض شده، جدول جدید ایجاد کن
+  if (!savedPuzzle || savedPuzzleDate !== today) {
+    const newPuzzle = DailyPuzzle.getDailyPuzzle();
+    setDailyPuzzle(newPuzzle);
+    localStorage.setItem('dailyPuzzle', JSON.stringify(newPuzzle));
+    localStorage.setItem('dailyPuzzleDate', today);
+  } else {
+    setDailyPuzzle(JSON.parse(savedPuzzle));
+  }
+  
+  if (savedUser) {
+    const user = JSON.parse(savedUser);
+    setCurrentUser(user);
+    fetchUserStats(user.id);
+    // بازی رو با جدول روزانه شروع کن
+    startNewGame(user.id);
+  }
+  
+  fetchUsers();
+  
+  const interval = setInterval(fetchUsers, 10000);
+  return () => clearInterval(interval);
+}, []);
 
   const fetchUserStats = async (userId) => {
     try {
@@ -106,11 +125,11 @@ const [availableSizes] = useState([3, 4, 5, 6, 7, 8]); // سایزهای موج�
 
   // شروع بازی جدید
   // شروع بازی جدید با سایز دلخواه
-const startNewGame = async (userId, size = puzzleSize) => {
+// شروع بازی جدید با جدول روزانه
+const startNewGame = async (userId) => {
+  if (!dailyPuzzle) return;
+  
   try {
-    // تولید جدول جدید
-    const newPuzzle = PuzzleGenerator.generatePuzzle(size, `جدول ${size}×${size}`);
-    
     const response = await fetch('/api/game', {
       method: 'POST',
       headers: {
@@ -119,7 +138,7 @@ const startNewGame = async (userId, size = puzzleSize) => {
       body: JSON.stringify({
         action: 'start',
         userId: userId,
-        gameData: { puzzle: newPuzzle }
+        gameData: { puzzle: dailyPuzzle }
       }),
     });
 
@@ -128,8 +147,8 @@ const startNewGame = async (userId, size = puzzleSize) => {
       setCurrentGameId(data.game.id);
       setScore(0);
       setMistakes(0);
-      setUserInput(Array(size).fill().map(() => Array(size).fill('')));
-      setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
+      setUserInput(Array(dailyPuzzle.size).fill().map(() => Array(dailyPuzzle.size).fill('')));
+      setCellStatus(Array(dailyPuzzle.size).fill().map(() => Array(dailyPuzzle.size).fill('empty')));
       setSelectedCell([0, 0]);
       setGameCompleted(false);
     }
@@ -426,39 +445,17 @@ const startNewGame = async (userId, size = puzzleSize) => {
 <ProgressChart users={users} currentUser={currentUser} />
 
 
-{/* انتخاب سایز جدول */}
-{currentUser && (
-  <div style={{ marginBottom: '30px', padding: '15px', backgroundColor: '#f0f8ff', borderRadius: '10px' }}>
-    <h3>📐 انتخاب سایز جدول</h3>
-    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-      {availableSizes.map(size => (
-        <div
-          key={size}
-          onClick={() => {
-            setPuzzleSize(size);
-            startNewGame(currentUser.id, size);
-          }}
-          style={{
-            padding: '10px 15px',
-            backgroundColor: puzzleSize === size ? '#0070f3' : '#e0e0e0',
-            color: puzzleSize === size ? 'white' : 'black',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            minWidth: '50px',
-            textAlign: 'center'
-          }}
-        >
-          {size}×{size}
-        </div>
-      ))}
-    </div>
-    <p style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
-      سایز فعلی: <strong>{puzzleSize}×{puzzleSize}</strong>
+{/* اطلاعات جدول روزانه */}
+{dailyPuzzle && (
+  <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#e8f5e8', borderRadius: '10px' }}>
+    <h3>📅 جدول روزانه</h3>
+    <p style={{ margin: '5px 0', fontWeight: 'bold' }}>{dailyPuzzle.title}</p>
+    <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
+      سایز: {dailyPuzzle.size}×{dailyPuzzle.size} | 
+      امروز همه کاربران این جدول رو حل می‌کنند
     </p>
   </div>
 )}
-
 
 
 
