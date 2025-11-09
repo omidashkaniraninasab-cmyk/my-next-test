@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import ProgressChart from '../components/ProgressChart';
 
 // داده نمونه برای جدول کراسورد
 const samplePuzzle = {
@@ -410,6 +411,12 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+
+
+      {/* نمودارهای پیشرفت */}
+<ProgressChart users={users} currentUser={currentUser} />
+
 
       {/* بازی کراسورد */}
       <div style={{ marginBottom: '40px' }}>
