@@ -213,54 +213,53 @@ export default function HomePage() {
   };
 
   // ورود حرف
-  // ورود حرف
-const handleInput = async (char) => {
-  if (gameCompleted || !currentUser) return;
+  const handleInput = async (char) => {
+    if (gameCompleted || !currentUser) return;
 
-  const [row, col] = selectedCell;
-  
-  // اگر خانه قبلاً قفل شده باشد، کاری نکن
-  if (cellStatus[row][col] === 'locked') return;
+    const [row, col] = selectedCell;
+    
+    // اگر خانه قبلاً قفل شده باشد، کاری نکن
+    if (cellStatus[row][col] === 'locked') return;
 
-  const newInput = [...userInput];
-  newInput[row][col] = char;
-  setUserInput(newInput);
+    const newInput = [...userInput];
+    newInput[row][col] = char;
+    setUserInput(newInput);
 
-  // بررسی پاسخ
-  const isCorrect = char === samplePuzzle.solution[row][col];
-  const newCellStatus = [...cellStatus];
+    // بررسی پاسخ
+    const isCorrect = char === samplePuzzle.solution[row][col];
+    const newCellStatus = [...cellStatus];
 
-  let scoreToAdd = 0;
+    let scoreToAdd = 0;
 
-  if (isCorrect) {
-    // خانه رو قفل کن
-    newCellStatus[row][col] = 'locked';
-    scoreToAdd = 3; // 3 امتیاز برای پاسخ درست
-    const newScore = score + scoreToAdd;
-    setScore(newScore);
-  } else {
-    newCellStatus[row][col] = 'wrong';
-    scoreToAdd = -3; // همیشه 3 امتیاز کسر برای هر اشتباه
-    const newScore = score + scoreToAdd;
-    setScore(newScore);
-    setMistakes(mistakes + 1);
-  }
+    if (isCorrect) {
+      // خانه رو قفل کن
+      newCellStatus[row][col] = 'locked';
+      scoreToAdd = 3; // 3 امتیاز برای پاسخ درست
+      const newScore = score + scoreToAdd;
+      setScore(newScore);
+    } else {
+      newCellStatus[row][col] = 'wrong';
+      scoreToAdd = -3; // همیشه 3 امتیاز کسر برای هر اشتباه
+      const newScore = score + scoreToAdd;
+      setScore(newScore);
+      setMistakes(mistakes + 1);
+    }
 
-  setCellStatus(newCellStatus);
+    setCellStatus(newCellStatus);
 
-  // ذخیره امتیاز در دیتابیس فقط اگر امتیاز تغییر کرده
-  if (scoreToAdd !== 0) {
-    await updateUserScoreInDB(currentUser.id, scoreToAdd);
-  }
+    // ذخیره امتیاز در دیتابیس فقط اگر امتیاز تغییر کرده
+    if (scoreToAdd !== 0) {
+      await updateUserScoreInDB(currentUser.id, scoreToAdd);
+    }
 
-  // حرکت به خانه بعدی (فقط اگر خانه قفل نشده باشد)
-  if (!isCorrect) {
-    moveToNextCell(row, col);
-  } else {
-    // اگر خانه قفل شد، اولین خانه قفل نشده بعدی رو پیدا کن
-    findNextUnlockedCell();
-  }
-};
+    // حرکت به خانه بعدی (فقط اگر خانه قفل نشده باشد)
+    if (!isCorrect) {
+      moveToNextCell(row, col);
+    } else {
+      // اگر خانه قفل شد، اولین خانه قفل نشده بعدی رو پیدا کن
+      findNextUnlockedCell();
+    }
+  };
 
   // پیدا کردن اولین خانه قفل نشده بعدی
   const findNextUnlockedCell = () => {
@@ -337,10 +336,6 @@ const handleInput = async (char) => {
     ['ظ', 'ط', 'ز', 'ر', 'ذ', 'د', 'پ', 'و', 'ئ']
   ];
 
-  // آمار
-  const totalUsers = users.length;
-  const totalScore = users.reduce((sum, user) => sum + (user.total_crossword_score || 0), 0);
-
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* هدر */}
@@ -378,23 +373,6 @@ const handleInput = async (char) => {
         ) : (
           <div style={{ color: '#666' }}>👤 مهمان</div>
         )}
-      </div>
-      
-      {/* آمار لحظه‌ای */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
-        gap: '15px', 
-        marginBottom: '30px' 
-      }}>
-        <div style={{ padding: '15px', backgroundColor: '#e3f2fd', borderRadius: '8px', textAlign: 'center' }}>
-          <div style={{ fontSize: '20px', fontWeight: 'bold' }}>{totalUsers}</div>
-          <div>👥 کاربران</div>
-        </div>
-        <div style={{ padding: '15px', backgroundColor: '#e8f5e8', borderRadius: '8px', textAlign: 'center' }}>
-          <div style={{ fontSize: '20px', fontWeight: 'bold' }}>{totalScore}</div>
-          <div>🎯 امتیاز کل</div>
-        </div>
       </div>
 
       {/* پروفایل کاربر لاگین شده */}
