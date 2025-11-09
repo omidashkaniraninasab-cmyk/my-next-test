@@ -2,8 +2,6 @@
 import { useState, useEffect } from 'react';
 import ProgressChart from '../components/ProgressChart';
 import { dailyPuzzleData } from '../lib/dailyPuzzleData';
-// import { PuzzleGenerator } from '../lib/puzzleGenerator'; // دیگر نیازی نیست
-// import { DailyPuzzle } from '../lib/dailyPuzzle'; // دیگر نیازی نیست
 
 export default function HomePage() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -26,34 +24,68 @@ export default function HomePage() {
   const [selectedCell, setSelectedCell] = useState([0, 0]);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [currentGameId, setCurrentGameId] = useState(null);
-  const [dailyPuzzle, setDailyPuzzle] = useState(null);
+  const [dailyPuzzle, setDailyPuzzle] = useState(dailyPuzzleData);
 
-  // وقتی صفحه لود شد
+  // وقتی صفحه لود شد - بررسی session کاربر
   useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    
-    // همیشه و فقط از فایل dailyPuzzleData شما استفاده می‌کنیم
-    setDailyPuzzle(dailyPuzzleData);
-    localStorage.setItem('dailyPuzzle', JSON.stringify(dailyPuzzleData));
-    localStorage.setItem('dailyPuzzleDate', new Date().toISOString().split('T')[0]);
-    
-    // مقداردهی اولیه آرایه‌های بازی بر اساس سایز فایل dailyPuzzleData
-    const size = dailyPuzzleData.size;
-    setUserInput(Array(size).fill().map(() => Array(size).fill('')));
-    setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
-    
-    if (savedUser) {
-      const user = JSON.parse(savedUser);
-      setCurrentUser(user);
-      fetchUserStats(user.id);
-      startNewGame(user.id);
-    }
-    
+    checkUserSession();
+    initializeGame();
     fetchUsers();
     
     const interval = setInterval(fetchUsers, 10000);
     return () => clearInterval(interval);
-  }, []); // وابسته به dailyPuzzleData اگر می‌خواهید با هر تغییر خودکار آپدیت شود
+  }, []);
+
+  // بررسی session کاربر از سرور
+  const checkUserSession = async () => {
+    try {
+      const response = await fetch('/api/auth/session', {
+        credentials: 'include' // ارسال کوکی‌ها
+      });
+      
+      if (response.ok) {
+        const userData = await response.json();
+        if (userData.user) {
+          setCurrentUser(userData.user);
+          loadUserGameState(userData.user.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking session:', error);
+    }
+  };
+
+  // مقداردهی اولیه بازی
+  const initializeGame = () => {
+    const size = dailyPuzzleData.size;
+    setUserInput(Array(size).fill().map(() => Array(size).fill('')));
+    setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
+    setDailyPuzzle(dailyPuzzleData);
+  };
+
+  // لود وضعیت بازی کاربر از سرور
+  const loadUserGameState = async (userId) => {
+    try {
+      const response = await fetch(`/api/game/state?userId=${userId}`);
+      if (response.ok) {
+        const gameState = await response.json();
+        if (gameState && gameState.userProgress) {
+          setUserInput(gameState.userProgress.userInput || []);
+          setCellStatus(gameState.userProgress.cellStatus || []);
+          setScore(gameState.score || 0);
+          setMistakes(gameState.mistakes || 0);
+          setSelectedCell(gameState.userProgress.selectedCell || [0, 0]);
+          setGameCompleted(gameState.completed || false);
+          setCurrentGameId(gameState.id);
+        } else {
+          // اگر بازی فعالی نداره، بازی جدید شروع کن
+          startNewGame(userId);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading game state:', error);
+    }
+  };
 
   const fetchUserStats = async (userId) => {
     try {
@@ -93,7 +125,7 @@ export default function HomePage() {
         body: JSON.stringify({
           action: 'start',
           userId: userId,
-          gameData: { puzzle: dailyPuzzleData } // استفاده از داده‌های فایل شما
+          gameData: { puzzle: dailyPuzzleData }
         }),
       });
 
@@ -103,7 +135,6 @@ export default function HomePage() {
         setScore(0);
         setMistakes(0);
         
-        // استفاده از سایز از فایل داده شما
         const size = dailyPuzzleData.size;
         setUserInput(Array(size).fill().map(() => Array(size).fill('')));
         setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
@@ -143,28 +174,24 @@ export default function HomePage() {
     setLoading(true);
     
     try {
-      const response = await fetch('/api/users', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify(formData),
       });
 
       if (response.ok) {
-        const newUser = await response.json();
-        setCurrentUser(newUser.user);
-        localStorage.setItem('currentUser', JSON.stringify(newUser.user));
+        const result = await response.json();
+        setCurrentUser(result.user);
         setFormData({
-          username: '',
-          email: '',
-          password: '',
-          firstName: '',
-          lastName: '',
-          bankCardNumber: ''
+          username: '', email: '', password: '',
+          firstName: '', lastName: '', bankCardNumber: ''
         });
         await fetchUsers();
-        startNewGame(newUser.user.id);
+        startNewGame(result.user.id);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -173,16 +200,19 @@ export default function HomePage() {
     }
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('currentUser');
-    const size = dailyPuzzleData.size;
-    setUserInput(Array(size).fill().map(() => Array(size).fill('')));
-    setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
-    setScore(0);
-    setMistakes(0);
-    setSelectedCell([0, 0]);
-    setGameCompleted(false);
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      setCurrentUser(null);
+      initializeGame();
+      await fetchUsers();
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
   };
 
   const handleInputChange = (e) => {
@@ -199,9 +229,33 @@ export default function HomePage() {
     }
   };
 
+  // تابع جدید برای ذخیره وضعیت بازی در سرور
+  const saveGameStateToServer = async (input, status, currentScore, currentMistakes) => {
+    try {
+      await fetch('/api/game/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          gameId: currentGameId,
+          userProgress: {
+            userInput: input,
+            cellStatus: status,
+            selectedCell: selectedCell
+          },
+          score: currentScore,
+          mistakes: currentMistakes
+        }),
+      });
+    } catch (error) {
+      console.error('Error saving game state:', error);
+    }
+  };
+
   // ورود حرف
   const handleInput = async (char) => {
-    if (gameCompleted || !currentUser) return;
+    if (gameCompleted || !currentUser || !currentGameId) return;
 
     const [row, col] = selectedCell;
     
@@ -233,6 +287,9 @@ export default function HomePage() {
     }
 
     setCellStatus(newCellStatus);
+
+    // ذخیره وضعیت بازی در سرور
+    await saveGameStateToServer(newInput, newCellStatus, score + scoreToAdd, mistakes + (isCorrect ? 0 : 1));
 
     // ذخیره امتیاز در دیتابیس فقط اگر امتیاز تغییر کرده
     if (scoreToAdd !== 0) {
@@ -311,6 +368,22 @@ export default function HomePage() {
       setScore(finalScore);
       setGameCompleted(true);
       
+      // تکمیل بازی در سرور
+      try {
+        await fetch('/api/game/complete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            gameId: currentGameId,
+            finalScore: finalScore
+          }),
+        });
+      } catch (error) {
+        console.error('Error completing game:', error);
+      }
+      
       // ذخیره پاداش تکمیل بازی در دیتابیس
       await updateUserScoreInDB(currentUser.id, 50);
     }
@@ -347,6 +420,23 @@ export default function HomePage() {
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '18px', fontWeight: 'bold' }}>🎯 {score} امتیاز</div>
           <div style={{ color: '#666' }}>❌ {mistakes} اشتباه</div>
+          {currentUser && (
+            <button 
+              onClick={handleLogout}
+              style={{
+                marginTop: '10px',
+                padding: '5px 10px',
+                backgroundColor: '#ff4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              خروج
+            </button>
+          )}
         </div>
       </div>
 
