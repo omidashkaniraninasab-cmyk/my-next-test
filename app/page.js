@@ -38,25 +38,35 @@ export default function HomePage() {
 
   // بررسی session کاربر از سرور
  // بررسی session کاربر از سرور
+// بررسی session کاربر از سرور
 const checkUserSession = async () => {
   try {
-    // چک کردن session از cookie
-    const sessionId = document.cookie.match(/session=([^;]+)/)?.[1];
+    console.log('🔍 Checking user session...');
     
-    const response = await fetch(`/api/auth/session?sessionId=${sessionId || ''}`);
+    const response = await fetch('/api/auth/session', {
+      credentials: 'include'
+    });
     
     if (response.ok) {
       const userData = await response.json();
+      console.log('🔍 Session response:', userData);
+      
       if (userData.user) {
+        console.log('✅ User found in session:', userData.user.id);
         setCurrentUser(userData.user);
-        loadUserGameState(userData.user.id);
+        
+        // این دو خط رو اضافه کنید:
+        await fetchUserStats(userData.user.id);
+        await loadUserGameState(userData.user.id);
+        
+      } else {
+        console.log('❌ No user in session');
       }
     }
   } catch (error) {
-    console.error('Error checking session:', error);
+    console.error('❌ Error checking session:', error);
   }
 };
-
   // مقداردهی اولیه بازی
  // مقداردهی اولیه بازی
 const initializeGame = () => {
@@ -130,6 +140,7 @@ const loadUserGameState = async (userId) => {
       
       if (currentUserData) {
         console.log('📊 User stats loaded:', {
+          id: currentUserData.id,
           total: currentUserData.total_crossword_score,
           today: currentUserData.today_crossword_score,
           games: currentUserData.crossword_games_played
@@ -146,7 +157,6 @@ const loadUserGameState = async (userId) => {
     console.error('❌ Error:', error);
   }
 };
-
   const fetchUsers = async () => {
     try {
       const response = await fetch('/api/users');
