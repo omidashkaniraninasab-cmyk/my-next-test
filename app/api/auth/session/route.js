@@ -15,8 +15,10 @@ export async function GET(request) {
     }
     
   } catch (error) {
+    console.error('Session error:', error);
     return Response.json({ 
-      error: error.message 
+      error: 'Internal server error',
+      details: error.message 
     }, { status: 500 });
   }
 }
