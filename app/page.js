@@ -58,15 +58,22 @@ const checkUserSession = async () => {
 };
 
   // مقداردهی اولیه بازی
-  const initializeGame = () => {
-    const size = dailyPuzzleData.size;
-    setUserInput(Array(size).fill().map(() => Array(size).fill('')));
-    setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
-    setDailyPuzzle(dailyPuzzleData);
-  };
+ // مقداردهی اولیه بازی
+const initializeGame = () => {
+  const size = dailyPuzzleData.size;
+  console.log('🎯 Initializing game with size:', size);
+  
+  // ایجاد آرایه‌های ایمن
+  setUserInput(Array(size).fill().map(() => Array(size).fill('')));
+  setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
+  setDailyPuzzle(dailyPuzzleData);
+  
+  console.log('✅ Game initialized');
+};
 
   // لود وضعیت بازی کاربر از سرور
   // لود وضعیت بازی کاربر از سرور
+// لود وضعیت بازی کاربر از سرور
 const loadUserGameState = async (userId) => {
   try {
     console.log('🔄 Loading game state for user:', userId);
@@ -80,8 +87,16 @@ const loadUserGameState = async (userId) => {
       if (gameState && gameState.userProgress) {
         console.log('✅ Setting game state from server');
         
-        setUserInput(gameState.userProgress.userInput || []);
-        setCellStatus(gameState.userProgress.cellStatus || []);
+        // مقداردهی ایمن آرایه‌ها
+        const size = dailyPuzzleData.size;
+        
+        // ایجاد آرایه‌های پیش‌فرض
+        const defaultUserInput = Array(size).fill().map(() => Array(size).fill(''));
+        const defaultCellStatus = Array(size).fill().map(() => Array(size).fill('empty'));
+        
+        // استفاده از داده‌های سرور یا مقادیر پیش‌فرض
+        setUserInput(gameState.userProgress.userInput || defaultUserInput);
+        setCellStatus(gameState.userProgress.cellStatus || defaultCellStatus);
         setScore(gameState.score || 0);
         setMistakes(gameState.mistakes || 0);
         setSelectedCell(gameState.userProgress.selectedCell || [0, 0]);
@@ -89,6 +104,8 @@ const loadUserGameState = async (userId) => {
         setCurrentGameId(gameState.id);
         
         console.log('🎮 Game state loaded successfully');
+        console.log('📊 UserInput length:', (gameState.userProgress.userInput || defaultUserInput).length);
+        console.log('📊 CellStatus length:', (gameState.userProgress.cellStatus || defaultCellStatus).length);
       } else {
         console.log('🆕 No active game found, starting new game');
         // اگر بازی فعالی نداره، بازی جدید شروع کن
@@ -585,7 +602,7 @@ const loadUserGameState = async (userId) => {
                     opacity: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? 0.8 : 1
                   }}
                 >
-                  {userInput[rowIndex] && userInput[rowIndex][colIndex]}
+                  {userInput[rowIndex] && userInput[rowIndex][colIndex] !== undefined ? userInput[rowIndex][colIndex] : ''}
                   {cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' && ' 🔒'}
                 </div>
               ))
