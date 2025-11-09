@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import ProgressChart from '../components/ProgressChart';
+import { PuzzleGenerator } from '../lib/puzzleGenerator';
 
 // داده نمونه برای جدول کراسورد
 const samplePuzzle = {
@@ -56,6 +57,9 @@ export default function HomePage() {
   const [selectedCell, setSelectedCell] = useState([0, 0]);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [currentGameId, setCurrentGameId] = useState(null);
+  // بعد از stateهای موجود اضافه کن:
+const [puzzleSize, setPuzzleSize] = useState(5); // سایز پیش‌فرض
+const [availableSizes] = useState([3, 4, 5, 6, 7, 8]); // سایزهای موجود
 
   // وقتی صفحه لود شد
   useEffect(() => {
@@ -101,34 +105,38 @@ export default function HomePage() {
   };
 
   // شروع بازی جدید
-  const startNewGame = async (userId) => {
-    try {
-      const response = await fetch('/api/game', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'start',
-          userId: userId,
-          gameData: { puzzle: samplePuzzle }
-        }),
-      });
+  // شروع بازی جدید با سایز دلخواه
+const startNewGame = async (userId, size = puzzleSize) => {
+  try {
+    // تولید جدول جدید
+    const newPuzzle = PuzzleGenerator.generatePuzzle(size, `جدول ${size}×${size}`);
+    
+    const response = await fetch('/api/game', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'start',
+        userId: userId,
+        gameData: { puzzle: newPuzzle }
+      }),
+    });
 
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentGameId(data.game.id);
-        setScore(0);
-        setMistakes(0);
-        setUserInput(Array(5).fill().map(() => Array(5).fill('')));
-        setCellStatus(Array(5).fill().map(() => Array(5).fill('empty')));
-        setSelectedCell([0, 0]);
-        setGameCompleted(false);
-      }
-    } catch (error) {
-      console.error('Error starting game:', error);
+    if (response.ok) {
+      const data = await response.json();
+      setCurrentGameId(data.game.id);
+      setScore(0);
+      setMistakes(0);
+      setUserInput(Array(size).fill().map(() => Array(size).fill('')));
+      setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
+      setSelectedCell([0, 0]);
+      setGameCompleted(false);
     }
-  };
+  } catch (error) {
+    console.error('Error starting game:', error);
+  }
+};
 
   // آپدیت امتیاز کاربر در دیتابیس
   const updateUserScoreInDB = async (userId, additionalScore) => {
@@ -416,6 +424,42 @@ export default function HomePage() {
 
       {/* نمودارهای پیشرفت */}
 <ProgressChart users={users} currentUser={currentUser} />
+
+
+{/* انتخاب سایز جدول */}
+{currentUser && (
+  <div style={{ marginBottom: '30px', padding: '15px', backgroundColor: '#f0f8ff', borderRadius: '10px' }}>
+    <h3>📐 انتخاب سایز جدول</h3>
+    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+      {availableSizes.map(size => (
+        <div
+          key={size}
+          onClick={() => {
+            setPuzzleSize(size);
+            startNewGame(currentUser.id, size);
+          }}
+          style={{
+            padding: '10px 15px',
+            backgroundColor: puzzleSize === size ? '#0070f3' : '#e0e0e0',
+            color: puzzleSize === size ? 'white' : 'black',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            minWidth: '50px',
+            textAlign: 'center'
+          }}
+        >
+          {size}×{size}
+        </div>
+      ))}
+    </div>
+    <p style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
+      سایز فعلی: <strong>{puzzleSize}×{puzzleSize}</strong>
+    </p>
+  </div>
+)}
+
+
 
 
       {/* بازی کراسورد */}
