@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import { updateUserRanks } from '@/lib/db';
 
 const sql = neon(process.env.DATABASE_URL);
 
@@ -12,7 +13,7 @@ export async function POST(request) {
       return Response.json({ error: 'User ID required' }, { status: 400 });
     }
 
-    // آپدیت همزمان امتیاز امروز و امتیاز کل
+    // آپدیت امتیاز کاربر
     await sql`
       UPDATE user_profiles 
       SET 
@@ -23,7 +24,10 @@ export async function POST(request) {
       WHERE id = ${userId}
     `;
 
-    console.log('✅ Score updated successfully');
+    // آپدیت رتبه همه کاربران
+    await updateUserRanks();
+
+    console.log('✅ Score and ranks updated successfully');
 
     return Response.json({ success: true });
     
