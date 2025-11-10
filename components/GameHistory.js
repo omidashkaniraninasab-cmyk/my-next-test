@@ -42,7 +42,7 @@ export default function GameHistory({ userId }) {
 
   return (
     <div style={{ marginTop: '20px' }}>
-      <h3>📜 تاریخچه بازی‌های اخیر</h3>
+      <h3>📜 تاریخچه بازی‌های قبلی</h3>
       
       {history.length === 0 ? (
         <p style={{ textAlign: 'center', color: '#666', padding: '20px' }}>
