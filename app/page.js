@@ -39,6 +39,7 @@ export default function HomePage() {
   // بررسی session کاربر از سرور
  // بررسی session کاربر از سرور
 // بررسی session کاربر از سرور
+// بررسی session کاربر از سرور
 const checkUserSession = async () => {
   try {
     console.log('🔍 Checking user session...');
@@ -55,10 +56,11 @@ const checkUserSession = async () => {
         console.log('✅ User found in session:', userData.user.id);
         setCurrentUser(userData.user);
         
-        // این دو خط رو اضافه کنید:
+        // آپدیت زمان ورود
+        await updateLoginTime(userData.user.id);
+        
         await fetchUserStats(userData.user.id);
         await loadUserGameState(userData.user.id);
-        
       } else {
         console.log('❌ No user in session');
       }
@@ -286,26 +288,59 @@ const loadUserGameState = async (userId) => {
 };
 
   const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
-      });
-      
-      setCurrentUser(null);
-      initializeGame();
-      await fetchUsers();
-    } catch (error) {
-      console.error('Error logging out:', error);
+  try {
+    if (currentUser) {
+      // آپدیت زمان خروج
+      await updateLogoutTime(currentUser.id);
     }
-  };
-
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
+    
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include'
     });
-  };
+    
+    setCurrentUser(null);
+    initializeGame();
+    await fetchUsers();
+    
+    console.log('✅ User logged out successfully');
+  } catch (error) {
+    console.error('❌ Error logging out:', error);
+  }
+};
+
+// آپدیت زمان ورود در دیتابیس
+const updateLoginTime = async (userId) => {
+  try {
+    await fetch('/api/users/update-login-time', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+    console.log('✅ Login time updated');
+  } catch (error) {
+    console.error('❌ Error updating login time:', error);
+  }
+};
+
+// آپدیت زمان خروج در دیتابیس
+const updateLogoutTime = async (userId) => {
+  try {
+    await fetch('/api/users/update-logout-time', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+    console.log('✅ Logout time updated');
+  } catch (error) {
+    console.error('❌ Error updating logout time:', error);
+  }
+};
+
 
   // انتخاب خانه - فقط خانه‌های قفل نشده قابل انتخاب هستند
   const handleCellSelect = (row, col) => {
