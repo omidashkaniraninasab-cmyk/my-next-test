@@ -628,7 +628,7 @@ const saveGameToHistory = async (userId, gameId, finalScore, mistakeCount) => {
               <p><strong>ورود امروز:</strong> {currentUser.today_login_time ? new Date(currentUser.today_login_time).toLocaleString('fa-IR') : 'ثبت نشده'}</p>
               <p><strong>خروج امروز:</strong> {currentUser.today_logout_time ? new Date(currentUser.today_logout_time).toLocaleString('fa-IR') : 'ثبت نشده'}</p>
             </div>
-            // و دقیقاً بعد از آن این رو اضافه کنید:
+           
 {currentUser && (
   <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
     <GameHistory userId={currentUser.id} />
