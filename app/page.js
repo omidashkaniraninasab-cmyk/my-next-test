@@ -28,48 +28,73 @@ export default function HomePage() {
   const [dailyPuzzle, setDailyPuzzle] = useState(dailyPuzzleData);
 
   // وقتی صفحه لود شد - بررسی session کاربر
-  useEffect(() => {
-    checkUserSession();
-    initializeGame();
-    fetchUsers();
+ // وقتی صفحه لود شد - بررسی session کاربر
+useEffect(() => {
+  const initializeApp = async () => {
+    console.log('🚀 Initializing application...');
     
-    const interval = setInterval(fetchUsers, 10000);
-    return () => clearInterval(interval);
-  }, []);
+    // اول session رو بازیابی کن
+    const sessionRestored = await restoreSession();
+    
+    if (!sessionRestored) {
+      // اگر session نداره، بازی جدید شروع کن
+      initializeGame();
+    }
+    
+    // لیست کاربران رو بگیر
+    await fetchUsers();
+    
+    console.log('✅ App initialization completed');
+  };
 
-  // بررسی session کاربر از سرور
- // بررسی session کاربر از سرور
-// بررسی session کاربر از سرور
-// بررسی session کاربر از سرور
-const checkUserSession = async () => {
+  initializeApp();
+  
+  const interval = setInterval(fetchUsers, 10000);
+  return () => clearInterval(interval);
+}, []);
+
+
+  // تابع جدید برای بازیابی session بعد از رفرش
+const restoreSession = async () => {
   try {
-    console.log('🔍 Checking user session...');
+    console.log('🔄 Restoring session after page refresh...');
     
     const response = await fetch('/api/auth/session', {
-      credentials: 'include'
+      credentials: 'include',
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
     });
     
     if (response.ok) {
-      const userData = await response.json();
-      console.log('🔍 Session response:', userData);
+      const sessionData = await response.json();
+      console.log('📦 Session restore response:', sessionData);
       
-      if (userData.user) {
-        console.log('✅ User found in session:', userData.user.id);
-        setCurrentUser(userData.user);
+      if (sessionData.user) {
+        console.log('✅ Session restored successfully:', sessionData.user.id);
+        setCurrentUser(sessionData.user);
         
         // آپدیت زمان ورود
-        await updateLoginTime(userData.user.id);
+        await updateLoginTime(sessionData.user.id);
         
-        await fetchUserStats(userData.user.id);
-        await loadUserGameState(userData.user.id);
+        // لود اطلاعات کاربر و بازی
+        await fetchUserStats(sessionData.user.id);
+        await loadUserGameState(sessionData.user.id);
+        
+        return true;
       } else {
-        console.log('❌ No user in session');
+        console.log('❌ No active session found after refresh');
+        return false;
       }
     }
   } catch (error) {
-    console.error('❌ Error checking session:', error);
+    console.error('❌ Error restoring session:', error);
+    return false;
   }
 };
+
+ 
+
   // مقداردهی اولیه بازی
  // مقداردهی اولیه بازی
 const initializeGame = () => {
