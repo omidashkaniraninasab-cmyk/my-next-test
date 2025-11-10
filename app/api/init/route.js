@@ -47,9 +47,26 @@ export async function GET() {
     `;
     console.log('✅ crossword_games table created/verified');
 
+    // ایجاد جدول تاریخچه بازی‌ها
+    await sql`
+      CREATE TABLE IF NOT EXISTS game_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES user_profiles(id),
+        game_id INTEGER REFERENCES crossword_games(id),
+        puzzle_title VARCHAR(200) NOT NULL,
+        puzzle_size INTEGER NOT NULL,
+        score INTEGER NOT NULL,
+        mistakes INTEGER NOT NULL,
+        completion_time INTEGER,
+        completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+    console.log('✅ game_history table created/verified');
+
     return Response.json({ 
       success: true,
-      message: '✅ جدول پروفایل کاربر و بازی‌های کراسورد ایجاد شد'
+      message: '✅ همه جدول‌ها ایجاد شدند'
     });
     
   } catch (error) {
