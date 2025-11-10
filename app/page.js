@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import ProgressChart from '../components/ProgressChart';
+import GameHistory from '../components/GameHistory'; // این خط رو اضافه کنید
 import { dailyPuzzleData } from '../lib/dailyPuzzleData';
 
 export default function HomePage() {
@@ -477,44 +478,72 @@ const handleInputChange = (e) => {
   };
 
   // بررسی تکمیل بازی - همه خانه‌ها باید قفل شده باشند
-  const checkGameCompletion = async () => {
-    let allLocked = true;
-    
-    for (let i = 0; i < dailyPuzzleData.size; i++) {
-      for (let j = 0; j < dailyPuzzleData.size; j++) {
-        if (dailyPuzzleData.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
-          allLocked = false;
-          break;
-        }
+const checkGameCompletion = async () => {
+  let allLocked = true;
+  
+  for (let i = 0; i < dailyPuzzleData.size; i++) {
+    for (let j = 0; j < dailyPuzzleData.size; j++) {
+      if (dailyPuzzleData.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
+        allLocked = false;
+        break;
       }
-      if (!allLocked) break;
     }
+    if (!allLocked) break;
+  }
 
-    if (allLocked && !gameCompleted) {
-      const finalScore = score + 50;
-      setScore(finalScore);
-      setGameCompleted(true);
+  if (allLocked && !gameCompleted) {
+    const finalScore = score + 50;
+    setScore(finalScore);
+    setGameCompleted(true);
+    
+    // تکمیل بازی در سرور
+    try {
+      await fetch('/api/game/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          gameId: currentGameId,
+          finalScore: finalScore
+        }),
+      });
+
+      // ذخیره در تاریخچه بازی‌ها
+      await saveGameToHistory(currentUser.id, currentGameId, finalScore, mistakes);
       
-      // تکمیل بازی در سرور
-      try {
-        await fetch('/api/game/complete', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            gameId: currentGameId,
-            finalScore: finalScore
-          }),
-        });
-      } catch (error) {
-        console.error('Error completing game:', error);
-      }
-      
-      // ذخیره پاداش تکمیل بازی در دیتابیس
-      await updateUserScoreInDB(currentUser.id, 50);
+    } catch (error) {
+      console.error('Error completing game:', error);
     }
-  };
+    
+    // ذخیره پاداش تکمیل بازی در دیتابیس
+    await updateUserScoreInDB(currentUser.id, 50);
+  }
+};
+
+
+// تابع جدید برای ذخیره بازی در تاریخچه
+const saveGameToHistory = async (userId, gameId, finalScore, mistakeCount) => {
+  try {
+    await fetch('/api/game/save-history', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: userId,
+        gameId: gameId,
+        puzzleData: dailyPuzzleData,
+        score: finalScore,
+        mistakes: mistakeCount
+      }),
+    });
+    console.log('✅ Game saved to history');
+  } catch (error) {
+    console.error('Error saving game history:', error);
+  }
+};
+
 
   // صفحه کلید فارسی
   const persianKeyboard = [
@@ -599,6 +628,12 @@ const handleInputChange = (e) => {
               <p><strong>ورود امروز:</strong> {currentUser.today_login_time ? new Date(currentUser.today_login_time).toLocaleString('fa-IR') : 'ثبت نشده'}</p>
               <p><strong>خروج امروز:</strong> {currentUser.today_logout_time ? new Date(currentUser.today_logout_time).toLocaleString('fa-IR') : 'ثبت نشده'}</p>
             </div>
+            // و دقیقاً بعد از آن این رو اضافه کنید:
+{currentUser && (
+  <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+    <GameHistory userId={currentUser.id} />
+  </div>
+)}
           </div>
         </div>
       )}
