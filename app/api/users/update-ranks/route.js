@@ -2,11 +2,7 @@ import { updateUserRanks } from '@/lib/db';
 
 export async function POST(request) {
   try {
-    console.log('🔄 Starting rank update...');
-    
     const updatedCount = await updateUserRanks();
-    
-    console.log('✅ Ranks updated successfully');
     
     return Response.json({ 
       success: true,
