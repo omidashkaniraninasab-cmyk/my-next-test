@@ -2,16 +2,21 @@ import { getSession, debugSessions } from '@/lib/auth';
 
 export async function GET(request) {
   try {
-    // دریافت sessionId از cookie
+    // دریافت sessionId از cookie - تصحیح شده
     const cookieHeader = request.headers.get('cookie');
     console.log('🍪 All cookies:', cookieHeader);
     
-    const sessionId = cookieHeader?.match(/session=([^;]+)/)?.[1];
-    
-    console.log('🔑 Extracted sessionId:', sessionId);
+    // روش درست برای استخراج session از کوکی
+    const sessionId = cookieHeader
+      ?.split(';')
+      .map(cookie => cookie.trim())
+      .find(cookie => cookie.startsWith('session='))
+      ?.split('=')[1];
+
+    console.log('🔑 Correctly extracted sessionId:', sessionId);
 
     // دیباگ: همه sessionهای اخیر رو ببین
-    await debugSessions();
+    const recentSessions = await debugSessions();
 
     if (!sessionId) {
       console.log('❌ No sessionId found in cookies');
