@@ -341,6 +341,13 @@ const updateLogoutTime = async (userId) => {
   }
 };
 
+const handleInputChange = (e) => {
+  setFormData({
+    ...formData,
+    [e.target.name]: e.target.value
+  });
+};
+
 
   // انتخاب خانه - فقط خانه‌های قفل نشده قابل انتخاب هستند
   const handleCellSelect = (row, col) => {
