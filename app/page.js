@@ -90,11 +90,19 @@ const restoreSession = async () => {
         return true;
       } else {
         console.log('❌ No active session found after refresh');
+        
+        // همیشه وقتی session نیست، کاربر رو null کن و بازی رو ریست کن
+        setCurrentUser(null);
+        initializeGame();
         return false;
       }
     }
   } catch (error) {
     console.error('❌ Error restoring session:', error);
+    
+    // در صورت خطا هم کاربر رو null کن و بازی رو ریست کن
+    setCurrentUser(null);
+    initializeGame();
     return false;
   }
 };
