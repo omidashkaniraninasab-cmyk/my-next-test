@@ -25,8 +25,9 @@ export default function HomePage() {
   const [selectedCell, setSelectedCell] = useState([0, 0]);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [currentGameId, setCurrentGameId] = useState(null);
-  const [dailyPuzzle, setDailyPuzzle] = useState(dailyPuzzleData);
+  const [dailyPuzzle, setDailyPuzzle] = useState(null);
  const [showLoginForm, setShowLoginForm] = useState(false);
+ const [puzzleLoading, setPuzzleLoading] = useState(true);
 const [loginData, setLoginData] = useState({
   email: '',
   password: ''
@@ -56,7 +57,7 @@ useEffect(() => {
         crossword_games_played: 0,
         crossword_rank: 0
       });
-      initializeGame();
+   
     }
     
     // لیست کاربران رو بگیر
@@ -87,26 +88,32 @@ const restoreSession = async () => {
       const sessionData = await response.json();
       console.log('📦 Session restore response:', sessionData);
       
-      if (sessionData.user) {
-        console.log('✅ Session restored successfully:', sessionData.user.id);
-        setCurrentUser(sessionData.user);
-        
-        // آپدیت زمان ورود
-        await updateLoginTime(sessionData.user.id);
-        
-        // لود اطلاعات کاربر و بازی
-        await fetchUserStats(sessionData.user.id);
-        await loadUserGameState(sessionData.user.id);
-        
-        return true;
-      } else {
-        console.log('❌ No active session found after refresh');
-        
-        // همیشه وقتی session نیست، کاربر رو null کن و بازی رو ریست کن
-        setCurrentUser(null);
-        initializeGame();
-        return false;
-      }
+     if (sessionData.user) {
+  console.log('✅ Session restored successfully:', sessionData.user.id);
+  setCurrentUser(sessionData.user);
+  
+  // آپدیت زمان ورود
+  await updateLoginTime(sessionData.user.id);
+  
+  // لود اطلاعات کاربر و بازی
+  await fetchUserStats(sessionData.user.id);
+  await loadUserGameState(sessionData.user.id);
+  
+  // لود جدول روزانه - برای کاربران ثبت‌نام شده
+  await loadDailyPuzzle();
+  
+  return true;
+} else {
+  console.log('❌ No active session found after refresh');
+  
+  // همیشه وقتی session نیست، کاربر رو null کن
+  setCurrentUser(null);
+  
+  // لود جدول روزانه - برای کاربران مهمان
+  await loadDailyPuzzle();
+  
+  return false;
+}
     }
   } catch (error) {
     console.error('❌ Error restoring session:', error);
@@ -118,18 +125,53 @@ const restoreSession = async () => {
   }
 };
 
- 
+// تابع برای لود جدول روزانه از دیتابیس
+const loadDailyPuzzle = async () => {
+  try {
+    setPuzzleLoading(true);
+    console.log('🎯 Loading daily puzzle from database...');
+    
+    const today = new Date().toISOString().split('T')[0];
+    const response = await fetch(`/api/daily-puzzle?date=${today}`);
+    
+    if (response.ok) {
+      const puzzleData = await response.json();
+      
+      if (puzzleData.error) {
+        // اگر جدول امروز موجود نیست، از فایل استفاده کن
+        console.log('📅 No daily puzzle in DB, using file');
+        const puzzleModule = await import('@/lib/dailyPuzzleData');
+        setDailyPuzzle(puzzleModule.dailyPuzzleData);
+      } else {
+        // جدول از دیتابیس
+        console.log('✅ Daily puzzle loaded from DB');
+        setDailyPuzzle(puzzleData);
+      }
+    } else {
+      // اگر خطا بود، از فایل استفاده کن
+      console.log('❌ Error loading from DB, using file');
+      const puzzleModule = await import('@/lib/dailyPuzzleData');
+      setDailyPuzzle(puzzleModule.dailyPuzzleData);
+    }
+  } catch (error) {
+    console.error('💥 Error loading daily puzzle:', error);
+    const puzzleModule = await import('@/lib/dailyPuzzleData');
+    setDailyPuzzle(puzzleModule.dailyPuzzleData);
+  } finally {
+    setPuzzleLoading(false);
+  }
+};
 
   // مقداردهی اولیه بازی
  // مقداردهی اولیه بازی
 const initializeGame = () => {
-  const size = dailyPuzzleData.size;
+  const size = dailyPuzzle ? dailyPuzzle.size : dailyPuzzleData.size;
   console.log('🎯 Initializing game with size:', size);
   
   // ایجاد آرایه‌های ایمن
   setUserInput(Array(size).fill().map(() => Array(size).fill('')));
   setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
-  setDailyPuzzle(dailyPuzzleData);
+ 
   
   console.log('✅ Game initialized');
 };
@@ -650,8 +692,7 @@ const handleLogin = async (email, password) => {
     ['ظ', 'ط', 'ز', 'ر', 'ذ', 'د', 'پ', 'و', 'ئ']
   ];
 
-  // استفاده از dailyPuzzleData به عنوان منبع اصلی
-  const puzzle = dailyPuzzleData;
+ 
 
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -683,7 +724,7 @@ const handleLogin = async (email, password) => {
         fontSize: '14px',
         opacity: '0.9'
       }}>
-        {puzzle.title}
+       {dailyPuzzle ? dailyPuzzle.title : dailyPuzzleData.title}
       </div>
     </div>
 
@@ -1107,11 +1148,11 @@ const handleLogin = async (email, password) => {
         <div style={{ marginBottom: '40px' }}>
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: `repeat(${puzzle.size}, 60px)`,
+           gridTemplateColumns: `repeat(${dailyPuzzle ? dailyPuzzle.size : dailyPuzzleData.size}, 60px)`,
             gap: '2px',
             marginBottom: '20px'
           }}>
-            {puzzle.grid.map((row, rowIndex) => (
+            {dailyPuzzle && dailyPuzzle.grid.map((row, rowIndex) => (
               row.map((cell, colIndex) => (
                 <div
                   key={`${rowIndex}-${colIndex}`}
@@ -1143,30 +1184,27 @@ const handleLogin = async (email, password) => {
             ))}
           </div>
 
-          {/* راهنما */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: '1fr 1fr', 
-            gap: '20px',
-            fontSize: '14px'
-          }}>
-            <div>
-              <h3>➡️ افقی</h3>
-              {Object.entries(puzzle.across).map(([num, clue]) => (
-                <p key={num} style={{ margin: '5px 0' }}>
-                  <strong>{num}:</strong> {clue.clue}
-                </p>
-              ))}
-            </div>
-            <div>
-              <h3>⬇️ عمودی</h3>
-              {Object.entries(puzzle.down).map(([num, clue]) => (
-                <p key={num} style={{ margin: '5px 0' }}>
-                  <strong>{num}:</strong> {clue.clue}
-                </p>
-              ))}
-            </div>
-          </div>
+         {/* راهنما */}
+{dailyPuzzle && (
+  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '14px' }}>
+    <div>
+      <h3>➡️ افقی</h3>
+      {Object.entries(dailyPuzzle.across).map(([num, clue]) => (
+        <p key={num} style={{ margin: '5px 0' }}>
+          <strong>{num}:</strong> {clue.clue}
+        </p>
+      ))}
+    </div>
+    <div>
+      <h3>⬇️ عمودی</h3>
+      {Object.entries(dailyPuzzle.down).map(([num, clue]) => (
+        <p key={num} style={{ margin: '5px 0' }}>
+          <strong>{num}:</strong> {clue.clue}
+        </p>
+      ))}
+    </div>
+  </div>
+)}
 
           {/* صفحه کلید - فقط برای کاربران لاگین شده */}
           {currentUser && !gameCompleted && (

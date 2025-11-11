@@ -3,166 +3,101 @@ import { useState } from 'react';
 
 export default function AdminPanel() {
   const [message, setMessage] = useState('');
-  
-  const handleSubmit = async (formData) => {
-    const puzzleData = {
-      date: formData.get('date'),
-      title: formData.get('title'),
-      size: 5,
-      grid: [
-        [1,1,1,1,1],
-        [1,1,1,1,1], 
-        [1,1,1,1,1],
-        [1,1,1,1,1],
-        [1,1,1,1,1]
-      ],
-      solution: [
-        ["الف","ب","پ","ت","ث"],
-        ["ج","چ","ح","خ","د"],
-        ["ذ","ر","ز","ژ","س"],
-        ["ش","ص","ض","ط","ظ"],
-        ["ع","غ","ف","ق","ک"]
-      ],
-      across: {
-        "1": { clue: formData.get('across1'), row: 0, col: 0, length: 5 }
-      },
-      down: {
-        "1": { clue: formData.get('down1'), row: 0, col: 0, length: 5 }
-      }
-    };
+  const [loading, setLoading] = useState(false);
 
+  const handlePublish = async () => {
+    setLoading(true);
+    setMessage('');
+    
     try {
-      const response = await fetch('/api/admin/daily-puzzle', {
+      const response = await fetch('/api/admin/publish-puzzle', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(puzzleData)
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       const result = await response.json();
-      setMessage(result.success ? '✅ جدول با موفقیت ذخیره شد!' : '❌ خطا: ' + result.error);
+      
+      if (result.success) {
+        setMessage('✅ جدول با موفقیت منتشر شد!');
+      } else {
+        setMessage('❌ خطا: ' + result.error);
+      }
     } catch (error) {
       setMessage('❌ خطا در ارتباط با سرور');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
-      <h1>پنل مدیریت جدول‌های روزانه</h1>
+    <div style={{ 
+      padding: '40px', 
+      maxWidth: '600px', 
+      margin: '0 auto',
+      fontFamily: 'system-ui'
+    }}>
+      <h1 style={{ textAlign: 'center', color: '#333' }}>
+        🎯 پنل مدیریت جدول روزانه
+      </h1>
       
-      {message && (
-        <div style={{ 
-          padding: '10px', 
-          backgroundColor: message.includes('✅') ? '#d4edda' : '#f8d7da',
-          border: `1px solid ${message.includes('✅') ? '#c3e6cb' : '#f5c6cb'}`,
-          borderRadius: '5px',
-          marginBottom: '20px',
-          color: message.includes('✅') ? '#155724' : '#721c24'
-        }}>
-          {message}
-        </div>
-      )}
-
-      <form 
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSubmit(new FormData(e.target));
-        }}
-        style={{
-          padding: '20px',
-          border: '1px solid #ddd',
-          borderRadius: '10px',
-          backgroundColor: '#f9f9f9'
-        }}
-      >
-        <h3>افزودن جدول جدید</h3>
+      <div style={{
+        marginTop: '30px',
+        padding: '20px',
+        border: '2px solid #e0e0e0',
+        borderRadius: '10px',
+        backgroundColor: '#f9f9f9'
+      }}>
+        <h3 style={{ color: '#555' }}>📊 وضعیت فعلی</h3>
+        <p>برای انتشار جدول جدید، دکمه زیر را بزنید:</p>
         
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            تاریخ جدول:
-          </label>
-          <input 
-            type="date" 
-            name="date"
-            required
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px' 
-            }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            عنوان جدول:
-          </label>
-          <input 
-            type="text" 
-            name="title"
-            placeholder="مثلاً: جدول یکشنبه"
-            required
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px' 
-            }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            سرنخ افقی ۱:
-          </label>
-          <input 
-            type="text" 
-            name="across1"
-            placeholder="مثلاً: اولین سرود"
-            required
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px' 
-            }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            سرنخ عمودی ۱:
-          </label>
-          <input 
-            type="text" 
-            name="down1"
-            placeholder="مثلاً: نخستین خانه" 
-            required
-            style={{ 
-              width: '100%', 
-              padding: '8px', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px' 
-            }}
-          />
-        </div>
+        {message && (
+          <div style={{
+            padding: '10px',
+            backgroundColor: message.includes('✅') ? '#d4edda' : '#f8d7da',
+            border: `1px solid ${message.includes('✅') ? '#c3e6cb' : '#f5c6cb'}`,
+            borderRadius: '5px',
+            marginBottom: '15px',
+            color: message.includes('✅') ? '#155724' : '#721c24'
+          }}>
+            {message}
+          </div>
+        )}
 
         <button 
-          type="submit"
+          onClick={handlePublish}
+          disabled={loading}
           style={{
-            padding: '12px 30px',
-            backgroundColor: '#28a745',
+            width: '100%',
+            padding: '15px',
+            fontSize: '18px',
+            backgroundColor: loading ? '#6c757d' : '#28a745',
             color: 'white',
             border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            fontSize: '16px',
+            borderRadius: '8px',
+            cursor: loading ? 'not-allowed' : 'pointer',
             fontWeight: 'bold'
           }}
         >
-          📤 ذخیره جدول
+          {loading ? '⏳ در حال انتشار...' : '🚀 انتشار جدول جدید از فایل'}
         </button>
-      </form>
+
+        <div style={{ 
+          marginTop: '20px', 
+          padding: '15px',
+          backgroundColor: '#e7f3ff',
+          borderRadius: '5px',
+          fontSize: '14px'
+        }}>
+          <strong>ℹ️ راهنما:</strong>
+          <ul style={{ margin: '10px 0', paddingLeft: '20px' }}>
+            <li>ابتدا فایل <code>lib/dailyPuzzleData.js</code> را ویرایش کنید</li>
+            <li>سپس دکمه بالا را بزنید</li>
+            <li>همه کاربران بلافاصله جدول جدید را می‌بینند</li>
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
