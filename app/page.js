@@ -42,8 +42,20 @@ useEffect(() => {
     // اول session رو بازیابی کن
     const sessionRestored = await restoreSession();
     
-    if (!sessionRestored) {
-      // اگر session نداره، بازی جدید شروع کن
+    if (!sessionRestored && !currentUser) {
+      // اگر session نداره و کاربری لاگین نیست، اتوماتیک مهمان بشه
+      console.log('🎮 Auto-login as guest');
+      setCurrentUser({
+        id: 'guest',
+        username: 'مهمان',
+        first_name: 'کاربر',
+        last_name: 'مهمان',
+        email: 'guest@example.com',
+        total_crossword_score: 0,
+        today_crossword_score: 0,
+        crossword_games_played: 0,
+        crossword_rank: 0
+      });
       initializeGame();
     }
     
@@ -57,8 +69,7 @@ useEffect(() => {
   
   const interval = setInterval(fetchUsers, 10000);
   return () => clearInterval(interval);
-}, []); // dependency خالی
-
+}, []);
 
   // تابع جدید برای بازیابی session بعد از رفرش
 const restoreSession = async () => {
@@ -678,65 +689,36 @@ const handleLogin = async (email, password) => {
 
     {/* منوی کاربر */}
     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-      {currentUser ? (
-        /* کاربر لاگین کرده */
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
-              👋 سلام {currentUser.first_name}!
-            </div>
-            <div style={{ fontSize: '12px', opacity: '0.9' }}>
-              🎯 امتیاز: {currentUser.total_crossword_score || 0}
-            </div>
-          </div>
-          <button 
-            onClick={handleLogout}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: 'rgba(255,255,255,0.2)',
-              color: 'white',
-              border: '1px solid rgba(255,255,255,0.3)',
-              borderRadius: '25px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              transition: 'all 0.3s'
-            }}
-            onMouseOver={(e) => {
-              e.target.style.backgroundColor = 'rgba(255,255,255,0.3)';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.backgroundColor = 'rgba(255,255,255,0.2)';
-            }}
-          >
-            🚪 خروج
-          </button>
-        </div>
-      ) : (
-   /* کاربر لاگین نکرده */
+     {currentUser ? (
+  /* کاربر لاگین کرده */
+  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+    <div style={{ textAlign: 'right' }}>
+      <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
+        {currentUser.id === 'guest' ? '🎮 شما مهمان هستید' : `👋 سلام ${currentUser.first_name}!`}
+      </div>
+      <div style={{ fontSize: '12px', opacity: '0.9' }}>
+        🎯 امتیاز: {currentUser.total_crossword_score || 0}
+      </div>
+    </div>
+    <button 
+      onClick={handleLogout}
+      style={{
+        padding: '8px 16px',
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        color: 'white',
+        border: '1px solid rgba(255,255,255,0.3)',
+        borderRadius: '25px',
+        cursor: 'pointer',
+        fontSize: '14px',
+        transition: 'all 0.3s'
+      }}
+    >
+      {currentUser.id === 'guest' ? '🚪 بستن' : '🚪 خروج'}
+    </button>
+  </div>
+) : (
+ /* کاربر لاگین نکرده */
 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-  {/* دکمه جدید: بازی به عنوان مهمان */}
- <button 
-  onClick={() => {
-    // حالت مهمان - بدون ثبت‌نام بازی کن
-    setCurrentUser({
-      id: 'guest',
-      username: 'مهمان',
-      first_name: 'کاربر',
-      last_name: 'مهمان',
-      email: 'guest@example.com',
-      total_crossword_score: 0,
-      today_crossword_score: 0,
-      crossword_games_played: 0,
-      crossword_rank: 0
-    });
-    setShowAuthModal(false);
-    initializeGame();
-  }}
->
-  🎮 مهمان
-</button>
-  
-  {/* دکمه‌های قبلی (ورود و ثبت‌نام) */}
   <button 
     onClick={() => {
       setShowAuthModal(true);
