@@ -34,15 +34,10 @@ const [loginData, setLoginData] = useState({
 const [showAuthModal, setShowAuthModal] = useState(false);
   // وقتی صفحه لود شد - بررسی session کاربر
  // وقتی صفحه لود شد - بررسی session کاربر
+// این useEffect رو پیدا کن و با این جایگزین کن:
 useEffect(() => {
   const initializeApp = async () => {
     console.log('🚀 Initializing application...');
-    
-    // اگر کاربر مهمان هست، بازی رو ریست نکن
-    if (isGuest) {
-      console.log('🎮 Guest session - keeping current game state');
-      return;
-    }
     
     // اول session رو بازیابی کن
     const sessionRestored = await restoreSession();
@@ -62,7 +57,7 @@ useEffect(() => {
   
   const interval = setInterval(fetchUsers, 10000);
   return () => clearInterval(interval);
-}, [isGuest]); // فقط وقتی isGuest تغییر میکنه اجرا بشه
+}, []); // dependency خالی
 
 
   // تابع جدید برای بازیابی session بعد از رفرش
@@ -95,14 +90,6 @@ const restoreSession = async () => {
         return true;
       } else {
         console.log('❌ No active session found after refresh');
-        
-        // اگر session نداره و قبلاً مهمان بودی، بازی رو ریست کن
-        if (currentUser && currentUser.id === 'guest') {
-          console.log('🎮 Guest user after refresh - resetting game');
-          setCurrentUser(null);
-          initializeGame();
-        }
-        
         return false;
       }
     }
@@ -734,19 +721,8 @@ const handleLogin = async (email, password) => {
       crossword_games_played: 0,
       crossword_rank: 0
     });
-    setIsGuest(true); // علامتگذاری کاربر به عنوان مهمان
     setShowAuthModal(false);
     initializeGame();
-  }}
-  style={{
-    padding: '8px 16px',
-    backgroundColor: 'transparent',
-    color: 'white',
-    border: '1px solid rgba(255,255,255,0.3)',
-    borderRadius: '25px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    opacity: '0.8'
   }}
 >
   🎮 مهمان
