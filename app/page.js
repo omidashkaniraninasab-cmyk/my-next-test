@@ -31,6 +31,7 @@ const [loginData, setLoginData] = useState({
   email: '',
   password: ''
 });
+const [showAuthModal, setShowAuthModal] = useState(false);
   // وقتی صفحه لود شد - بررسی session کاربر
  // وقتی صفحه لود شد - بررسی session کاربر
 useEffect(() => {
@@ -693,45 +694,85 @@ const handleLogin = async (email, password) => {
           </button>
         </div>
       ) : (
-        /* کاربر لاگین نکرده */
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button 
-            onClick={() => setShowLoginForm(true)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: 'rgba(255,255,255,0.2)',
-              color: 'white',
-              border: '1px solid rgba(255,255,255,0.3)',
-              borderRadius: '25px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            🔐 ورود
-          </button>
-          <button 
-            onClick={() => setShowLoginForm(false)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: 'white',
-              color: '#667eea',
-              border: 'none',
-              borderRadius: '25px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}
-          >
-            📝 ثبت‌نام
-          </button>
-        </div>
+   /* کاربر لاگین نکرده */
+<div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+  {/* دکمه جدید: بازی به عنوان مهمان */}
+  <button 
+    onClick={() => {
+      // حالت مهمان - بدون ثبت‌نام بازی کن
+      setCurrentUser({
+        id: 'guest',
+        username: 'مهمان',
+        first_name: 'کاربر',
+        last_name: 'مهمان',
+        email: 'guest@example.com',
+        total_crossword_score: 0,
+        today_crossword_score: 0,
+        crossword_games_played: 0,
+        crossword_rank: 0
+      });
+      setShowAuthModal(false);
+      initializeGame();
+    }}
+    style={{
+      padding: '8px 16px',
+      backgroundColor: 'transparent',
+      color: 'white',
+      border: '1px solid rgba(255,255,255,0.3)',
+      borderRadius: '25px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      opacity: '0.8'
+    }}
+  >
+    🎮 مهمان
+  </button>
+  
+  {/* دکمه‌های قبلی (ورود و ثبت‌نام) */}
+  <button 
+    onClick={() => {
+      setShowAuthModal(true);
+      setShowLoginForm(true);
+    }}
+    style={{
+      padding: '8px 16px',
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      color: 'white',
+      border: '1px solid rgba(255,255,255,0.3)',
+      borderRadius: '25px',
+      cursor: 'pointer',
+      fontSize: '14px'
+    }}
+  >
+    🔐 ورود
+  </button>
+  
+  <button 
+    onClick={() => {
+      setShowAuthModal(true);
+      setShowLoginForm(false);
+    }}
+    style={{
+      padding: '8px 16px',
+      backgroundColor: 'white',
+      color: '#667eea',
+      border: 'none',
+      borderRadius: '25px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: 'bold'
+    }}
+  >
+    📝 ثبت‌نام
+  </button>
+</div>
       )}
     </div>
   </div>
 </header>
 
 {/* مودال فرم‌های ورود و ثبت‌نام */}
-{!currentUser && (
+{!currentUser && showAuthModal && (
   <div style={{
     position: 'fixed',
     top: '50%',
