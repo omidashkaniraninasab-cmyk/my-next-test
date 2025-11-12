@@ -32,6 +32,7 @@ export default function HomePage() {
     password: ''
   });
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [todayGameCompleted, setTodayGameCompleted] = useState(false);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -79,16 +80,17 @@ export default function HomePage() {
         const sessionData = await response.json();
         console.log('📦 Session restore response:', sessionData);
         
-        if (sessionData.user) {
-          console.log('✅ Session restored successfully:', sessionData.user.id);
-          setCurrentUser(sessionData.user);
-          
-          await updateLoginTime(sessionData.user.id);
-          await fetchUserStats(sessionData.user.id);
-          await loadUserGameState(sessionData.user.id);
-          await loadDailyPuzzle();
-          
-          return true;
+       if (sessionData.user) {
+  console.log('✅ Session restored successfully:', sessionData.user.id);
+  setCurrentUser(sessionData.user);
+  
+  await updateLoginTime(sessionData.user.id);
+  await fetchUserStats(sessionData.user.id);
+  await checkGameStatus(sessionData.user.id);  // این خط رو اضافه کن
+  await loadUserGameState(sessionData.user.id);
+  await loadDailyPuzzle();
+  
+  return true;
         } else {
           console.log('❌ No active session found after refresh');
           setCurrentUser(null);
@@ -321,7 +323,7 @@ export default function HomePage() {
         
         setCurrentUser(result.user);
         console.log('🔵 4. Current user set:', result.user.id);
-        
+        await checkGameStatus(result.user.id);  // این خط رو اضافه کن
         setFormData({
           username: '', email: '', password: '',
           firstName: '', lastName: '', bankCardNumber: ''
@@ -529,47 +531,62 @@ export default function HomePage() {
     checkGameCompletion();
   };
 
-  const checkGameCompletion = async () => {
-    if (!dailyPuzzle) return;
-    
-    let allLocked = true;
-    
-    for (let i = 0; i < dailyPuzzle.size; i++) {
-      for (let j = 0; j < dailyPuzzle.size; j++) {
-        if (dailyPuzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
-          allLocked = false;
-          break;
-        }
+ const checkGameCompletion = async () => {
+  if (!dailyPuzzle) return;
+  
+  let allLocked = true;
+  
+  for (let i = 0; i < dailyPuzzle.size; i++) {
+    for (let j = 0; j < dailyPuzzle.size; j++) {
+      if (dailyPuzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
+        allLocked = false;
+        break;
       }
-      if (!allLocked) break;
     }
+    if (!allLocked) break;
+  }
 
-    if (allLocked && !gameCompleted) {
-      const finalScore = score + 50;
-      setScore(finalScore);
-      setGameCompleted(true);
-      
-      try {
-        await fetch('/api/game/complete', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            gameId: currentGameId,
-            finalScore: finalScore
-          }),
-        });
+  if (allLocked && !gameCompleted) {
+    const finalScore = score + 50;
+    setScore(finalScore);
+    setGameCompleted(true);
+    setTodayGameCompleted(true);
+    
+    // تکمیل بازی در سرور - حتماً userId رو هم بفرست
+    try {
+      const response = await fetch('/api/game/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          gameId: currentGameId,
+          finalScore: finalScore,
+          userId: currentUser.id  // این خط خیلی مهمه!
+        }),
+      });
 
-        await saveGameToHistory(currentUser.id, currentGameId, finalScore, mistakes);
+      if (response.ok) {
+        console.log('✅ Game completion saved to database');
         
-      } catch (error) {
-        console.error('Error completing game:', error);
+        // آپدیت اطلاعات کاربر
+        await fetchUserStats(currentUser.id);
+        
+      } else {
+        console.error('❌ Error saving game completion');
       }
+
+      // ذخیره در تاریخچه بازی‌ها
+      await saveGameToHistory(currentUser.id, currentGameId, finalScore, mistakes);
       
-      await updateUserScoreInDB(currentUser.id, 50);
+    } catch (error) {
+      console.error('❌ Error completing game:', error);
     }
-  };
+    
+    // ذخیره پاداش تکمیل بازی در دیتابیس
+    await updateUserScoreInDB(currentUser.id, 50);
+  }
+};
 
   const saveGameToHistory = async (userId, gameId, finalScore, mistakeCount) => {
     try {
@@ -629,6 +646,21 @@ export default function HomePage() {
       setLoading(false);
     }
   };
+
+
+  // تابع جدید برای بررسی وضعیت بازی
+const checkGameStatus = async (userId) => {
+  try {
+    const response = await fetch(`/api/game/status?userId=${userId}`);
+    if (response.ok) {
+      const status = await response.json();
+      setTodayGameCompleted(status.today_game_completed);
+      console.log('🎮 Game status:', status.today_game_completed ? 'Completed' : 'Not completed');
+    }
+  } catch (error) {
+    console.error('Error checking game status:', error);
+  }
+};
 
   const persianKeyboard = [
     ['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج', 'چ'],
@@ -1053,257 +1085,273 @@ export default function HomePage() {
       {/* نمودارهای پیشرفت */}
       <ProgressChart users={users} currentUser={currentUser} />
 
-      {/* اطلاعات جدول روزانه */}
-      {dailyPuzzle && (
+     {/* اطلاعات جدول روزانه */}
+{dailyPuzzle && (
+  <div style={{ 
+    marginBottom: '20px', 
+    padding: '20px', 
+    backgroundColor: dailyPuzzle.closed ? '#fff3cd' : '#e8f5e8', 
+    borderRadius: '10px',
+    textAlign: dailyPuzzle.closed ? 'center' : 'left'
+  }}>
+    {dailyPuzzle.closed ? (
+      // حالت بسته (۸-۹ شب)
+      <div>
+        <h3>⏸️ {dailyPuzzle.title}</h3>
+        <p style={{ margin: '10px 0', fontSize: '16px', color: '#856404' }}>
+          {dailyPuzzle.description}
+        </p>
         <div style={{ 
-          marginBottom: '20px', 
-          padding: '20px', 
-          backgroundColor: dailyPuzzle.closed ? '#fff3cd' : '#e8f5e8', 
-          borderRadius: '10px',
-          textAlign: dailyPuzzle.closed ? 'center' : 'left'
+          padding: '15px', 
+          backgroundColor: '#ffeaa7', 
+          borderRadius: '8px',
+          margin: '10px 0'
         }}>
-          {dailyPuzzle.closed ? (
-            <div>
-              <h3>⏸️ {dailyPuzzle.title}</h3>
-              <p style={{ margin: '10px 0', fontSize: '16px', color: '#856404' }}>
-                {dailyPuzzle.description}
-              </p>
-              <div style={{ 
-                padding: '15px', 
-                backgroundColor: '#ffeaa7', 
-                borderRadius: '8px',
-                margin: '10px 0'
-              }}>
-                <h4>🏆 نتایج امروز</h4>
-                <p>برندگان امروز به زودی اعلام می‌شوند...</p>
-                <p style={{ fontWeight: 'bold', marginTop: '10px' }}>
-                  ⏰ بازی بعدی: ساعت {dailyPuzzle.nextOpenTime}
-                </p>
-              </div>
+          <h4>🏆 نتایج امروز</h4>
+          <p>برندگان امروز به زودی اعلام می‌شوند...</p>
+          <p style={{ fontWeight: 'bold', marginTop: '10px' }}>
+            ⏰ بازی بعدی: ساعت {dailyPuzzle.nextOpenTime}
+          </p>
+        </div>
+      </div>
+    ) : (
+      // حالت باز
+      <div>
+        <h3>📅 جدول روزانه</h3>
+        <p style={{ margin: '5px 0', fontWeight: 'bold' }}>{dailyPuzzle.title}</p>
+        <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
+          سایز: {dailyPuzzle.size}×{dailyPuzzle.size} | 
+          تاریخ: {dailyPuzzle.date}
+        </p>
+      </div>
+    )}
+  </div>
+)}
+
+{/* بازی کراسورد */}
+<div style={{ marginBottom: '40px' }}>
+  {/* اگر کاربر لاگین نکرده باشد */}
+  {!currentUser && (
+    <div style={{ 
+      padding: '40px', 
+      textAlign: 'center', 
+      backgroundColor: '#fff3cd', 
+      borderRadius: '10px',
+      marginBottom: '20px'
+    }}>
+      <h3>⚠️ برای بازی باید ثبت‌نام کنید</h3>
+      <p>لطفاً در فرم زیر ثبت‌نام کنید تا بتوانید بازی کنید</p>
+    </div>
+  )}
+
+  {/* اگر بازی بسته است (۸-۹ شب) */}
+  {dailyPuzzle?.closed && currentUser && (
+    <div style={{ 
+      padding: '40px', 
+      textAlign: 'center', 
+      backgroundColor: '#fff3cd', 
+      borderRadius: '10px',
+      marginBottom: '20px'
+    }}>
+      <h3>⏸️ بازی موقتاً تعطیل است</h3>
+      <p>در حال به‌روزرسانی جدول جدید... ساعت ۹ شب برگشتیم! 🎯</p>
+    </div>
+  )}
+
+  {/* بازی فعال - فقط وقتی کاربر لاگین کرده، بازی باز است و هنوز بازی نکرده */}
+  {!dailyPuzzle?.closed && currentUser && !todayGameCompleted && !gameCompleted && (
+    <div style={{ marginBottom: '40px' }}>
+      {/* محتوای جدول و صفحه کلید */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: `repeat(${dailyPuzzle ? dailyPuzzle.size : 6}, 60px)`,
+        gap: '2px',
+        marginBottom: '20px'
+      }}>
+        {dailyPuzzle && dailyPuzzle.grid.map((row, rowIndex) => (
+          row.map((cell, colIndex) => (
+            <div
+              key={`${rowIndex}-${colIndex}`}
+              onClick={() => currentUser && handleCellSelect(rowIndex, colIndex)}
+              style={{
+                width: '60px',
+                height: '60px',
+                backgroundColor: cell === 0 ? '#333' : 
+                  selectedCell[0] === rowIndex && selectedCell[1] === colIndex ? '#0070f3' :
+                  cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '#2E7D32' :
+                  cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct' ? '#4CAF50' :
+                  cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'wrong' ? '#f44336' : '#fff',
+                border: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '2px solid #1B5E20' : '2px solid #ccc',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '20px',
+                fontWeight: 'bold',
+                cursor: currentUser && cell === 1 && cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] !== 'locked' && !gameCompleted ? 'pointer' : 'default',
+                color: (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked') || (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct') ? '#fff' : '#000',
+                transition: 'all 0.2s',
+                opacity: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? 0.8 : 1
+              }}
+            >
+              {userInput[rowIndex] && userInput[rowIndex][colIndex] !== undefined ? userInput[rowIndex][colIndex] : ''}
+              {cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' && ' 🔒'}
             </div>
-          ) : (
-            <div>
-              <h3>📅 جدول روزانه</h3>
-              <p style={{ margin: '5px 0', fontWeight: 'bold' }}>{dailyPuzzle.title}</p>
-              <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
-                سایز: {dailyPuzzle.size}×{dailyPuzzle.size} | 
-                تاریخ: {dailyPuzzle.date}
+          ))
+        ))}
+      </div>
+
+      {/* راهنما */}
+      {dailyPuzzle && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '14px' }}>
+          <div>
+            <h3>➡️ افقی</h3>
+            {Object.entries(dailyPuzzle.across).map(([num, clue]) => (
+              <p key={num} style={{ margin: '5px 0' }}>
+                <strong>{num}:</strong> {clue.clue}
               </p>
-            </div>
-          )}
+            ))}
+          </div>
+          <div>
+            <h3>⬇️ عمودی</h3>
+            {Object.entries(dailyPuzzle.down).map(([num, clue]) => (
+              <p key={num} style={{ margin: '5px 0' }}>
+                <strong>{num}:</strong> {clue.clue}
+              </p>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* بازی کراسورد */}
-      <div style={{ marginBottom: '40px' }}>
-        {/* اگر کاربر لاگین نکرده باشد */}
-        {!currentUser && (
-          <div style={{ 
-            padding: '40px', 
-            textAlign: 'center', 
-            backgroundColor: '#fff3cd', 
-            borderRadius: '10px',
-            marginBottom: '20px'
-          }}>
-            <h3>⚠️ برای بازی باید ثبت‌نام کنید</h3>
-            <p>لطفاً در فرم زیر ثبت‌نام کنید تا بتوانید بازی کنید</p>
-          </div>
-        )}
-
-        {/* جدول کراسورد - فقط وقتی بازی باز است نمایش بده */}
-        {!dailyPuzzle?.closed && currentUser && (
-          <div style={{ marginBottom: '40px' }}>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: `repeat(${dailyPuzzle ? dailyPuzzle.size : 6}, 60px)`,
-              gap: '2px',
-              marginBottom: '20px'
+      {/* صفحه کلید - فقط وقتی بازی باز است */}
+      {!gameCompleted && (
+        <div style={{ marginBottom: '30px' }}>
+          <h3>صفحه کلید</h3>
+          {persianKeyboard.map((row, rowIndex) => (
+            <div key={rowIndex} style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              gap: '5px', 
+              marginBottom: '10px' 
             }}>
-              {dailyPuzzle && dailyPuzzle.grid.map((row, rowIndex) => (
-                row.map((cell, colIndex) => (
-                  <div
-                    key={`${rowIndex}-${colIndex}`}
-                    onClick={() => currentUser && handleCellSelect(rowIndex, colIndex)}
-                    style={{
-                      width: '60px',
-                      height: '60px',
-                      backgroundColor: cell === 0 ? '#333' : 
-                        selectedCell[0] === rowIndex && selectedCell[1] === colIndex ? '#0070f3' :
-                        cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '#2E7D32' :
-                        cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct' ? '#4CAF50' :
-                        cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'wrong' ? '#f44336' : '#fff',
-                      border: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '2px solid #1B5E20' : '2px solid #ccc',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '20px',
-                      fontWeight: 'bold',
-                      cursor: currentUser && cell === 1 && cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] !== 'locked' && !gameCompleted ? 'pointer' : 'default',
-                      color: (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked') || (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct') ? '#fff' : '#000',
-                      transition: 'all 0.2s',
-                      opacity: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? 0.8 : 1
-                    }}
-                  >
-                    {userInput[rowIndex] && userInput[rowIndex][colIndex] !== undefined ? userInput[rowIndex][colIndex] : ''}
-                    {cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' && ' 🔒'}
-                  </div>
-                ))
+              {row.map(char => (
+                <div
+                  key={char}
+                  onClick={() => handleInput(char)}
+                  style={{
+                    padding: '10px 15px',
+                    fontSize: '16px',
+                    border: '1px solid #ccc',
+                    backgroundColor: '#f0f0f0',
+                    cursor: 'pointer',
+                    borderRadius: '5px',
+                    minWidth: '40px',
+                    textAlign: 'center'
+                  }}
+                >
+                  {char}
+                </div>
               ))}
             </div>
-
-            {/* راهنما */}
-            {dailyPuzzle && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '14px' }}>
-                <div>
-                  <h3>➡️ افقی</h3>
-                  {Object.entries(dailyPuzzle.across).map(([num, clue]) => (
-                    <p key={num} style={{ margin: '5px 0' }}>
-                      <strong>{num}:</strong> {clue.clue}
-                    </p>
-                  ))}
-                </div>
-                <div>
-                  <h3>⬇️ عمودی</h3>
-                  {Object.entries(dailyPuzzle.down).map(([num, clue]) => (
-                    <p key={num} style={{ margin: '5px 0' }}>
-                      <strong>{num}:</strong> {clue.clue}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* صفحه کلید - فقط وقتی بازی باز است */}
-            {!gameCompleted && (
-              <div style={{ marginBottom: '30px' }}>
-                <h3>صفحه کلید</h3>
-                {persianKeyboard.map((row, rowIndex) => (
-                  <div key={rowIndex} style={{ 
-                    display: 'flex', 
-                    justifyContent: 'center', 
-                    gap: '5px', 
-                    marginBottom: '10px' 
-                  }}>
-                    {row.map(char => (
-                      <div
-                        key={char}
-                        onClick={() => handleInput(char)}
-                        style={{
-                          padding: '10px 15px',
-                          fontSize: '16px',
-                          border: '1px solid #ccc',
-                          backgroundColor: '#f0f0f0',
-                          cursor: 'pointer',
-                          borderRadius: '5px',
-                          minWidth: '40px',
-                          textAlign: 'center'
-                        }}
-                      >
-                        {char}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* اگر بازی بسته است، پیام نمایش بده */}
-        {dailyPuzzle?.closed && currentUser && (
-          <div style={{ 
-            padding: '40px', 
-            textAlign: 'center', 
-            backgroundColor: '#fff3cd', 
-            borderRadius: '10px',
-            marginBottom: '20px'
-          }}>
-            <h3>⏸️ بازی موقتاً تعطیل است</h3>
-            <p>در حال به‌روزرسانی جدول جدید... ساعت ۹ شب برگشتیم! 🎯</p>
-          </div>
-        )}
-
-        {/* پیام تکمیل بازی */}
-        {gameCompleted && (
-          <div style={{ 
-            marginTop: '15px', 
-            padding: '15px', 
-            backgroundColor: '#e8f5e8', 
-            borderRadius: '5px',
-            textAlign: 'center',
-            fontSize: '18px',
-            fontWeight: 'bold'
-          }}>
-            🎉 تبریک! بازی با موفقیت تکمیل شد! +50 امتیاز پاداش
-          </div>
-        )}
-      </div>
-
-      {/* لیست کاربران - مرتب شده بر اساس امتیاز کل */}
-      <div>
-        <h2>رده‌بندی کاربران</h2>
-        <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
-          🔄 به روزرسانی خودکار هر 10 ثانیه - مرتب شده بر اساس امتیاز
+          ))}
         </div>
-        {users.length === 0 ? (
-          <p>هنوز کاربری ثبت‌نام نکرده است</p>
-        ) : (
-          <div style={{ display: 'grid', gap: '10px' }}>
-            {users
-              .sort((a, b) => (b.total_crossword_score || 0) - (a.total_crossword_score || 0))
-              .map((user, index) => (
-                <div key={user.id} style={{ 
-                  padding: '15px', 
-                  border: '1px solid #ddd', 
-                  borderRadius: '8px',
-                  backgroundColor: currentUser && user.id === currentUser.id ? '#e3f2fd' : '#f9f9f9',
-                  borderLeft: currentUser && user.id === currentUser.id ? '4px solid #0070f3' : '1px solid #ddd'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{
-                        width: '30px',
-                        height: '30px',
-                        backgroundColor: index === 0 ? '#FFD700' : 
-                                       index === 1 ? '#C0C0C0' : 
-                                       index === 2 ? '#CD7F32' : '#0070f3',
-                        color: 'white',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '14px',
-                        fontWeight: 'bold'
-                      }}>
-                        {index + 1}
-                      </div>
-                      <div>
-                        <strong>{user.username}</strong> - {user.first_name} {user.last_name}
-                        {currentUser && user.id === currentUser.id && <span style={{color: 'green', marginRight: '10px'}}> (شما)</span>}
-                        <br />
-                        📧 {user.email}
-                        <br />
-                        🎮 بازی‌ها: {user.crossword_games_played || 0}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#0070f3' }}>
-                        🎯 {user.total_crossword_score || 0}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#666' }}>
-                        ⏰ {new Date(user.registration_date).toLocaleDateString('fa-IR')}
-                      </div>
-                      {index === 0 && <div style={{ fontSize: '12px', color: '#FFD700' }}>🥇 طلایی</div>}
-                      {index === 1 && <div style={{ fontSize: '12px', color: '#C0C0C0' }}>🥈 نقره‌ای</div>}
-                      {index === 2 && <div style={{ fontSize: '12px', color: '#CD7F32' }}>🥉 برنزی</div>}
-                    </div>
-                  </div>
-                </div>
-              ))
-            }
-          </div>
-        )}
+      )}
+    </div>
+  )}
+
+  {/* پیام بعد از اتمام بازی - کاربر امروز بازی کرده */}
+  {(todayGameCompleted || gameCompleted) && currentUser && (
+    <div style={{ 
+      padding: '40px', 
+      textAlign: 'center', 
+      backgroundColor: '#e8f5e8', 
+      borderRadius: '10px',
+      marginBottom: '20px'
+    }}>
+      <h3>✅ بازی امروز تکمیل شد!</h3>
+      <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '10px 0' }}>
+        🎯 امتیاز شما امروز: <strong>{currentUser.today_crossword_score}</strong>
+      </p>
+      <p style={{ margin: '10px 0', color: '#666' }}>
+        ⏰ ساعت ۹ شب با جدول جدید برگشتیم! 🎯
+      </p>
+      <div style={{ 
+        padding: '15px', 
+        backgroundColor: '#d4edda', 
+        borderRadius: '8px',
+        margin: '10px 0'
+      }}>
+        <h4>🏆 امروز بازی کردید</h4>
+        <p>می‌توانید نتایج دیگران را در رده‌بندی مشاهده کنید</p>
       </div>
+    </div>
+  )}
+</div>
+
+{/* لیست کاربران - مرتب شده بر اساس امتیاز کل */}
+<div>
+  <h2>رده‌بندی کاربران</h2>
+  <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
+    🔄 به روزرسانی خودکار هر 10 ثانیه - مرتب شده بر اساس امتیاز
+  </div>
+  {users.length === 0 ? (
+    <p>هنوز کاربری ثبت‌نام نکرده است</p>
+  ) : (
+    <div style={{ display: 'grid', gap: '10px' }}>
+      {users
+        .sort((a, b) => (b.total_crossword_score || 0) - (a.total_crossword_score || 0))
+        .map((user, index) => (
+          <div key={user.id} style={{ 
+            padding: '15px', 
+            border: '1px solid #ddd', 
+            borderRadius: '8px',
+            backgroundColor: currentUser && user.id === currentUser.id ? '#e3f2fd' : '#f9f9f9',
+            borderLeft: currentUser && user.id === currentUser.id ? '4px solid #0070f3' : '1px solid #ddd'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '30px',
+                  height: '30px',
+                  backgroundColor: index === 0 ? '#FFD700' : 
+                                 index === 1 ? '#C0C0C0' : 
+                                 index === 2 ? '#CD7F32' : '#0070f3',
+                  color: 'white',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}>
+                  {index + 1}
+                </div>
+                <div>
+                  <strong>{user.username}</strong> - {user.first_name} {user.last_name}
+                  {currentUser && user.id === currentUser.id && <span style={{color: 'green', marginRight: '10px'}}> (شما)</span>}
+                  <br />
+                  📧 {user.email}
+                  <br />
+                  🎮 بازی‌ها: {user.crossword_games_played || 0}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#0070f3' }}>
+                  🎯 {user.total_crossword_score || 0}
+                </div>
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  ⏰ {new Date(user.registration_date).toLocaleDateString('fa-IR')}
+                </div>
+                {index === 0 && <div style={{ fontSize: '12px', color: '#FFD700' }}>🥇 طلایی</div>}
+                {index === 1 && <div style={{ fontSize: '12px', color: '#C0C0C0' }}>🥈 نقره‌ای</div>}
+                {index === 2 && <div style={{ fontSize: '12px', color: '#CD7F32' }}>🥉 برنزی</div>}
+              </div>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  )}
+</div>
     </div>
   );
 }
