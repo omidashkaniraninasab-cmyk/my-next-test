@@ -601,33 +601,39 @@ const handleInput = async (char) => {
     // ۳. آپدیت اطلاعات کاربر
     await fetchUserStats(currentUser.id);
     
-    // ۴. ذخیره در تاریخچه
-    await saveGameToHistory(currentUser.id, currentGameId, finalScore, mistakes);
+   
+await saveGameToHistory(currentUser.id, currentGameId, dailyPuzzle, finalScore, mistakes);
+
+
+
+
+//                                                    puzzleData اضافه شد
     
     console.log('🎉 Game completed with bonus!');
   }
 };
 
-  const saveGameToHistory = async (userId, gameId, finalScore, mistakeCount) => {
-    try {
-      await fetch('/api/game/save-history', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: userId,
-          gameId: gameId,
-          puzzleData: dailyPuzzle, // استفاده از dailyPuzzle
-          score: finalScore,
-          mistakes: mistakeCount
-        }),
-      });
-      console.log('✅ Game saved to history');
-    } catch (error) {
-      console.error('Error saving game history:', error);
-    }
-  };
+  const saveGameToHistory = async (userId, gameId, puzzleData, score, mistakes, completionTime = null) => {
+  try {
+    await fetch('/api/game/save-history', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: userId,
+        gameId: gameId,
+        puzzleData: puzzleData,
+        score: score,  // اینجا باید finalScore باشه!
+        mistakes: mistakes,
+        completionTime: completionTime
+      }),
+    });
+    console.log('✅ Game saved to history');
+  } catch (error) {
+    console.error('Error saving game history:', error);
+  }
+};
 
   const handleLogin = async (email, password) => {
     setLoading(true);
@@ -1174,7 +1180,7 @@ const checkGameStatus = async (userId) => {
       marginBottom: '20px'
     }}>
       <h3>⏸️ بازی موقتاً تعطیل است</h3>
-      <p>در حال به‌روزرسانی جدول جدید... ساعت ۹ شب برگشتیم! 🎯</p>
+      <p>در حال به‌روزرسانی جدول جدید... ساعت ۹ شب بر می گردیم! 🎯</p>
     </div>
   )}
 
@@ -1292,7 +1298,7 @@ const checkGameStatus = async (userId) => {
         🎯 امتیاز شما امروز: <strong>{currentUser.today_crossword_score}</strong>
       </p>
       <p style={{ margin: '10px 0', color: '#666' }}>
-        ⏰ ساعت ۹ شب با جدول جدید برگشتیم! 🎯
+        ⏰ ساعت ۹ شب با جدول جدید بر می گردیم! 🎯
       </p>
       <div style={{ 
         padding: '15px', 
@@ -1311,7 +1317,7 @@ const checkGameStatus = async (userId) => {
 <div>
   <h2>رده‌بندی کاربران</h2>
   <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
-    🔄 به روزرسانی خودکار هر 10 ثانیه - مرتب شده بر اساس امتیاز
+    🔄 به روزرسانی خودکار هر یک دقیقه - مرتب شده بر اساس امتیاز
   </div>
   {users.length === 0 ? (
     <p>هنوز کاربری ثبت‌نام نکرده است</p>
