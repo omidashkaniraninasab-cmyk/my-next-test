@@ -1,8 +1,8 @@
 export async function POST(request) {
   try {
-    const { gameId, finalScore, userId } = await request.json();
+    const { gameId, finalScore, userId, bonusScore } = await request.json();
     
-    console.log('🎯 Completing game - ONLY updating status, not scores');
+    console.log('🎯 Completing game with bonus:', bonusScore);
 
     // ۱. آپدیت وضعیت بازی
     await sql`
@@ -15,20 +15,21 @@ export async function POST(request) {
       WHERE id = ${gameId}
     `;
 
-    // ۲. آپدیت وضعیت کاربر - فقط today_game_completed رو آپدیت کن
+    // ۲. آپدیت وضعیت کاربر - پاداش رو اضافه کن و instant رو صفر کن
     await sql`
       UPDATE user_profiles 
       SET 
-        today_game_completed = TRUE,  // فقط این رو آپدیت کن
-        instant_crossword_score = 0   // امتیاز لحظه‌ای رو ریست کن
-        // امتیازها رو آپدیت نکن - قبلاً اضافه شدن
+        today_crossword_score = today_crossword_score + ${bonusScore},
+        total_crossword_score = total_crossword_score + ${bonusScore},
+        today_game_completed = TRUE,
+        instant_crossword_score = 0  -- حتماً صفر کن
       WHERE id = ${userId}
     `;
 
     // ۳. آپدیت رتبه همه کاربران
     await updateUserRanks();
 
-    console.log('✅ Game status updated (scores already added)');
+    console.log('✅ Game completed with bonus and instant score reset');
 
     return Response.json({ success: true });
     

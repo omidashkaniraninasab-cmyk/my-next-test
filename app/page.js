@@ -466,26 +466,23 @@ const handleInput = async (char) => {
   if (isCorrect) {
     newCellStatus[row][col] = 'locked';
     scoreToAdd = 3;
-    const newScore = score + scoreToAdd;
-    setScore(newScore);
     newInstantScore = instantScore + scoreToAdd;
-    setInstantScore(newInstantScore);
   } else {
     newCellStatus[row][col] = 'wrong';
     scoreToAdd = -3;
-    const newScore = score + scoreToAdd;
-    setScore(newScore);
     newInstantScore = instantScore + scoreToAdd;
-    setInstantScore(newInstantScore);
     setMistakes(mistakes + 1);
   }
 
+  // اول stateها رو آپدیت کن
+  setScore(score + scoreToAdd);
+  setInstantScore(newInstantScore);
   setCellStatus(newCellStatus);
 
-  // ذخیره وضعیت بازی در سرور
+  // سپس سرور رو آپدیت کن
   await saveGameStateToServer(newInput, newCellStatus, score + scoreToAdd, mistakes + (isCorrect ? 0 : 1));
 
-  // ذخیره امتیاز در دیتابیس - با امتیاز لحظه‌ای
+  // امتیاز رو در دیتابیس ذخیره کن - با instant جدید
   if (scoreToAdd !== 0) {
     await updateUserScoreInDB(currentUser.id, scoreToAdd, newInstantScore);
   }
@@ -557,13 +554,15 @@ const handleInput = async (char) => {
   }
 
   if (allLocked && !gameCompleted) {
-    const finalScore = score; // ❌ +50 رو حذف کن - قبلاً اضافه شده
+    // پاداش 50 امتیاز رو اضافه کن
+    const bonusScore = 50;
+    const finalScore = score + bonusScore;
     setScore(finalScore);
     setGameCompleted(true);
     setTodayGameCompleted(true);
     setInstantScore(0);
     
-    // تکمیل بازی در سرور - فقط وضعیت رو آپدیت کن، امتیاز نه
+    // تکمیل بازی در سرور - با پاداش
     try {
       const response = await fetch('/api/game/complete', {
         method: 'POST',
@@ -573,25 +572,23 @@ const handleInput = async (char) => {
         body: JSON.stringify({
           gameId: currentGameId,
           finalScore: finalScore,
-          userId: currentUser.id
+          userId: currentUser.id,
+          bonusScore: bonusScore  // پاداش رو مشخص کن
         }),
       });
 
       if (response.ok) {
-        console.log('✅ Game completion saved to database');
+        console.log('✅ Game completion with bonus saved to database');
         await fetchUserStats(currentUser.id);
       } else {
         console.error('❌ Error saving game completion');
       }
 
-      // ذخیره در تاریخچه بازی‌ها
       await saveGameToHistory(currentUser.id, currentGameId, finalScore, mistakes);
       
     } catch (error) {
       console.error('❌ Error completing game:', error);
     }
-    
-    
   }
 };
 
