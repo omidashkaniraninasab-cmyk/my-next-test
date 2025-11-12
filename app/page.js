@@ -33,6 +33,7 @@ export default function HomePage() {
   });
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [todayGameCompleted, setTodayGameCompleted] = useState(false);
+  const [instantScore, setInstantScore] = useState(0);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -260,6 +261,7 @@ export default function HomePage() {
         setCurrentGameId(data.game.id);
         setScore(0);
         setMistakes(0);
+        setInstantScore(0); // این خط رو اضافه کن
         
         const size = dailyPuzzle ? dailyPuzzle.size : 6; // استفاده از dailyPuzzle
         setUserInput(Array(size).fill().map(() => Array(size).fill('')));
@@ -464,11 +466,13 @@ export default function HomePage() {
       scoreToAdd = 3;
       const newScore = score + scoreToAdd;
       setScore(newScore);
+      setInstantScore(instantScore + scoreToAdd); // این خط رو اضافه کن
     } else {
       newCellStatus[row][col] = 'wrong';
       scoreToAdd = -3;
       const newScore = score + scoreToAdd;
       setScore(newScore);
+      setInstantScore(instantScore + scoreToAdd); // این خط رو اضافه کن
       setMistakes(mistakes + 1);
     }
 
@@ -551,6 +555,7 @@ export default function HomePage() {
     setScore(finalScore);
     setGameCompleted(true);
     setTodayGameCompleted(true);
+    setInstantScore(0); // این خط رو اضافه کن
     
     // تکمیل بازی در سرور - حتماً userId رو هم بفرست
     try {
