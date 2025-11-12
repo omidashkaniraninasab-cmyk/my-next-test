@@ -5,9 +5,9 @@ const sql = neon(process.env.DATABASE_URL);
 
 export async function POST(request) {
   try {
-    const { userId, additionalScore } = await request.json();
+    const { userId, additionalScore, currentInstantScore } = await request.json();
     
-    console.log('Updating score for user:', userId, 'Additional score:', additionalScore);
+    console.log('Updating score for user:', userId, 'Additional score:', additionalScore, 'Current instant:', currentInstantScore);
     
     if (!userId) {
       return Response.json({ error: 'User ID required' }, { status: 400 });
@@ -16,20 +16,20 @@ export async function POST(request) {
     // بررسی و ریست امتیاز امروز اگر تاریخ تغییر کرده
     await resetTodayScoreIfNeeded(userId);
 
-    // آپدیت امتیاز کاربر - فقط today_crossword_score برای امتیاز امروز
+    // آپدیت امتیاز کاربر - با instant_crossword_score
     await sql`
       UPDATE user_profiles 
       SET 
         today_crossword_score = COALESCE(today_crossword_score, 0) + ${additionalScore},
         total_crossword_score = COALESCE(total_crossword_score, 0) + ${additionalScore},
-        instant_crossword_score = ${additionalScore}
+        instant_crossword_score = ${currentInstantScore}  -- این خط رو برگردوندیم
       WHERE id = ${userId}
     `;
 
     // آپدیت رتبه همه کاربران
     await updateUserRanks();
 
-    console.log('✅ Score and ranks updated successfully');
+    console.log('✅ All scores updated successfully');
 
     return Response.json({ success: true });
     
@@ -39,15 +39,14 @@ export async function POST(request) {
   }
 }
 
-// تابع جدید برای ریست امتیاز امروز اگر تاریخ تغییر کرده
+// تابع برای ریست امتیاز امروز اگر تاریخ تغییر کرده
 async function resetTodayScoreIfNeeded(userId) {
   try {
     const today = new Date();
-    const todayDate = today.toISOString().split('T')[0]; // تاریخ امروز
+    const todayDate = today.toISOString().split('T')[0];
     
-    // بررسی آیا کاربر نیاز به ریست امتیاز امروز دارد
     const user = await sql`
-      SELECT today_login_time, today_crossword_score, last_score_reset_date
+      SELECT last_score_reset_date
       FROM user_profiles 
       WHERE id = ${userId}
     `;
@@ -58,16 +57,14 @@ async function resetTodayScoreIfNeeded(userId) {
     const lastResetDate = userData.last_score_reset_date ? 
       new Date(userData.last_score_reset_date).toISOString().split('T')[0] : null;
 
-    // اگر تاریخ ریست با امروز متفاوت است
     if (!lastResetDate || lastResetDate !== todayDate) {
+      console.log('🔄 Resetting today score for user:', userId);
       
-      console.log('🔄 Resetting today score for user:', userId, 'Previous reset date:', lastResetDate);
-      
-      // ریست امتیاز امروز و آپدیت تاریخ ریست
       await sql`
         UPDATE user_profiles 
         SET 
           today_crossword_score = 0,
+          instant_crossword_score = 0,
           last_score_reset_date = ${todayDate}
         WHERE id = ${userId}
       `;

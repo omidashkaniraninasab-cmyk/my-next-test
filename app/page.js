@@ -236,70 +236,71 @@ export default function HomePage() {
     }
   };
 
-  const startNewGame = async (userId) => {
-    try {
-      console.log('🎮 startNewGame called with userId:', userId);
+ // در startNewGame - ریست امتیاز لحظه‌ای در سرور
+const startNewGame = async (userId) => {
+  try {
+    console.log('🎮 startNewGame called with userId:', userId);
+    
+    const response = await fetch('/api/game', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'start',
+        userId: userId,
+        gameData: { puzzle: dailyPuzzle }
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Game started successfully:', data);
       
-      const response = await fetch('/api/game', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'start',
-          userId: userId,
-          gameData: { puzzle: dailyPuzzle } // استفاده از dailyPuzzle
-        }),
-      });
-
-      console.log('🎮 Game API response status:', response.status);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Game started successfully:', data);
-        
-        setCurrentGameId(data.game.id);
-        setScore(0);
-        setMistakes(0);
-        setInstantScore(0); // این خط رو اضافه کن
-        
-        const size = dailyPuzzle ? dailyPuzzle.size : 6; // استفاده از dailyPuzzle
-        setUserInput(Array(size).fill().map(() => Array(size).fill('')));
-        setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
-        setSelectedCell([0, 0]);
-        setGameCompleted(false);
-        
-        console.log('✅ Game state reset completed');
-      } else {
-        const errorData = await response.json();
-        console.error('❌ Game API error:', errorData);
-      }
-    } catch (error) {
-      console.error('❌ Error starting game:', error);
+      setCurrentGameId(data.game.id);
+      setScore(0);
+      setMistakes(0);
+      setInstantScore(0);
+      
+      // ریست امتیاز لحظه‌ای در سرور
+      await updateUserScoreInDB(userId, 0, 0);
+      
+      const size = dailyPuzzle ? dailyPuzzle.size : 6;
+      setUserInput(Array(size).fill().map(() => Array(size).fill('')));
+      setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
+      setSelectedCell([0, 0]);
+      setGameCompleted(false);
+      
+      console.log('✅ Game state reset completed');
     }
-  };
+  } catch (error) {
+    console.error('❌ Error starting game:', error);
+  }
+};
 
-  const updateUserScoreInDB = async (userId, additionalScore) => {
-    try {
-      const response = await fetch('/api/users/update-score', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: userId,
-          additionalScore: additionalScore
-        }),
-      });
+  // آپدیت تابع updateUserScoreInDB
+const updateUserScoreInDB = async (userId, additionalScore, currentInstantScore) => {
+  try {
+    const response = await fetch('/api/users/update-score', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: userId,
+        additionalScore: additionalScore,
+        currentInstantScore: currentInstantScore  // این پارامتر جدید
+      }),
+    });
 
-      if (response.ok) {
-        await fetchUserStats(userId);
-        await fetchUsers();
-      }
-    } catch (error) {
-      console.error('Error updating score:', error);
+    if (response.ok) {
+      await fetchUserStats(userId);
+      await fetchUsers();
     }
-  };
+  } catch (error) {
+    console.error('Error updating score:', error);
+  }
+};
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -444,52 +445,57 @@ export default function HomePage() {
     }
   };
 
-  const handleInput = async (char) => {
-    if (gameCompleted || !currentUser || !currentGameId || !dailyPuzzle) return;
+ // در handleInput - امتیاز لحظه‌ای رو به سرور بفرست
+const handleInput = async (char) => {
+  if (gameCompleted || !currentUser || !currentGameId || !dailyPuzzle) return;
 
-    const [row, col] = selectedCell;
-    
-    if (cellStatus[row][col] === 'locked') return;
+  const [row, col] = selectedCell;
+  
+  if (cellStatus[row][col] === 'locked') return;
 
-    const newInput = [...userInput];
-    newInput[row][col] = char;
-    setUserInput(newInput);
+  const newInput = [...userInput];
+  newInput[row][col] = char;
+  setUserInput(newInput);
 
-    // استفاده از dailyPuzzle به جای dailyPuzzleData
-    const isCorrect = char === dailyPuzzle.solution[row][col];
-    const newCellStatus = [...cellStatus];
+  const isCorrect = char === dailyPuzzle.solution[row][col];
+  const newCellStatus = [...cellStatus];
 
-    let scoreToAdd = 0;
+  let scoreToAdd = 0;
+  let newInstantScore = instantScore;
 
-    if (isCorrect) {
-      newCellStatus[row][col] = 'locked';
-      scoreToAdd = 3;
-      const newScore = score + scoreToAdd;
-      setScore(newScore);
-      setInstantScore(instantScore + scoreToAdd); // این خط رو اضافه کن
-    } else {
-      newCellStatus[row][col] = 'wrong';
-      scoreToAdd = -3;
-      const newScore = score + scoreToAdd;
-      setScore(newScore);
-      setInstantScore(instantScore + scoreToAdd); // این خط رو اضافه کن
-      setMistakes(mistakes + 1);
-    }
+  if (isCorrect) {
+    newCellStatus[row][col] = 'locked';
+    scoreToAdd = 3;
+    const newScore = score + scoreToAdd;
+    setScore(newScore);
+    newInstantScore = instantScore + scoreToAdd;
+    setInstantScore(newInstantScore);
+  } else {
+    newCellStatus[row][col] = 'wrong';
+    scoreToAdd = -3;
+    const newScore = score + scoreToAdd;
+    setScore(newScore);
+    newInstantScore = instantScore + scoreToAdd;
+    setInstantScore(newInstantScore);
+    setMistakes(mistakes + 1);
+  }
 
-    setCellStatus(newCellStatus);
+  setCellStatus(newCellStatus);
 
-    await saveGameStateToServer(newInput, newCellStatus, score + scoreToAdd, mistakes + (isCorrect ? 0 : 1));
+  // ذخیره وضعیت بازی در سرور
+  await saveGameStateToServer(newInput, newCellStatus, score + scoreToAdd, mistakes + (isCorrect ? 0 : 1));
 
-    if (scoreToAdd !== 0) {
-      await updateUserScoreInDB(currentUser.id, scoreToAdd);
-    }
+  // ذخیره امتیاز در دیتابیس - با امتیاز لحظه‌ای
+  if (scoreToAdd !== 0) {
+    await updateUserScoreInDB(currentUser.id, scoreToAdd, newInstantScore);
+  }
 
-    if (!isCorrect) {
-      moveToNextCell(row, col);
-    } else {
-      findNextUnlockedCell();
-    }
-  };
+  if (!isCorrect) {
+    moveToNextCell(row, col);
+  } else {
+    findNextUnlockedCell();
+  }
+};
 
   const findNextUnlockedCell = () => {
     if (!dailyPuzzle) return;
