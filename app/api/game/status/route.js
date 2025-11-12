@@ -1,3 +1,4 @@
+// app/api/game/status/route.js
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL);
