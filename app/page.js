@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import ProgressChart from '../components/ProgressChart';
 import GameHistory from '../components/GameHistory'; // این خط رو اضافه کنید
-import { dailyPuzzleData } from '../lib/dailyPuzzleData';
+
 
 export default function HomePage() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -125,36 +125,26 @@ const restoreSession = async () => {
   }
 };
 
-// تابع برای لود جدول روزانه از دیتابیس
+// تابع loadDailyPuzzle رو جایگزین کن:
 const loadDailyPuzzle = async () => {
   try {
     setPuzzleLoading(true);
-    console.log('🎯 Loading daily puzzle from database...');
+    console.log('🎯 Loading daily puzzle from SERVER file...');
     
-    const today = new Date().toISOString().split('T')[0];
-    const response = await fetch(`/api/daily-puzzle?date=${today}`);
+    // همیشه از API جدید لود کن
+    const response = await fetch('/api/daily-puzzle');
     
     if (response.ok) {
       const puzzleData = await response.json();
-      
-      if (puzzleData.error) {
-        // اگر جدول امروز موجود نیست، از فایل استفاده کن
-        console.log('📅 No daily puzzle in DB, using file');
-        const puzzleModule = await import('@/lib/dailyPuzzleData');
-        setDailyPuzzle(puzzleModule.dailyPuzzleData);
-      } else {
-        // جدول از دیتابیس
-        console.log('✅ Daily puzzle loaded from DB');
-        setDailyPuzzle(puzzleData);
-      }
+      setDailyPuzzle(puzzleData);
+      console.log('✅ Daily puzzle loaded from server file');
     } else {
-      // اگر خطا بود، از فایل استفاده کن
-      console.log('❌ Error loading from DB, using file');
-      const puzzleModule = await import('@/lib/dailyPuzzleData');
-      setDailyPuzzle(puzzleModule.dailyPuzzleData);
+      throw new Error('Failed to load puzzle');
     }
+    
   } catch (error) {
     console.error('💥 Error loading daily puzzle:', error);
+    // در صورت خطا، مستقیماً از فایل import کن (فقط به عنوان fallback)
     const puzzleModule = await import('@/lib/dailyPuzzleData');
     setDailyPuzzle(puzzleModule.dailyPuzzleData);
   } finally {
@@ -165,13 +155,16 @@ const loadDailyPuzzle = async () => {
   // مقداردهی اولیه بازی
  // مقداردهی اولیه بازی
 const initializeGame = () => {
-  const size = dailyPuzzle ? dailyPuzzle.size : dailyPuzzleData.size;
+  if (!dailyPuzzle) {
+    console.log('⏳ Waiting for puzzle to load...');
+    return;
+  }
+  
+  const size = dailyPuzzle.size;
   console.log('🎯 Initializing game with size:', size);
   
-  // ایجاد آرایه‌های ایمن
   setUserInput(Array(size).fill().map(() => Array(size).fill('')));
   setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
- 
   
   console.log('✅ Game initialized');
 };
@@ -724,7 +717,7 @@ const handleLogin = async (email, password) => {
         fontSize: '14px',
         opacity: '0.9'
       }}>
-       {dailyPuzzle ? dailyPuzzle.title : dailyPuzzleData.title}
+       {dailyPuzzle?.title || 'جدول روزانه'}
       </div>
     </div>
 
@@ -1147,11 +1140,11 @@ const handleLogin = async (email, password) => {
         {/* جدول کراسورد */}
         <div style={{ marginBottom: '40px' }}>
           <div style={{ 
-            display: 'grid', 
-           gridTemplateColumns: `repeat(${dailyPuzzle ? dailyPuzzle.size : dailyPuzzleData.size}, 60px)`,
-            gap: '2px',
-            marginBottom: '20px'
-          }}>
+  display: 'grid', 
+  gridTemplateColumns: `repeat(${dailyPuzzle ? dailyPuzzle.size : 6}, 60px)`,
+  gap: '2px',
+  marginBottom: '20px'
+}}>
             {dailyPuzzle && dailyPuzzle.grid.map((row, rowIndex) => (
               row.map((cell, colIndex) => (
                 <div
