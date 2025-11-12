@@ -1065,7 +1065,7 @@ const checkGameStatus = async (userId) => {
               <h3>🎮 اطلاعات بازی</h3>
               <p><strong>امتیاز کل:</strong> {currentUser.total_crossword_score || 0}</p>
               <p><strong>امتیاز امروز:</strong> {currentUser.today_crossword_score || 0}</p>
-              <p><strong>امتیاز لحظه‌ای:</strong> {currentUser.instant_crossword_score || 0}</p>
+              <p><strong>امتیاز لحظه‌ای:</strong> {instantScore}</p>
               <p><strong>تعداد بازی‌ها:</strong> {currentUser.crossword_games_played || 0}</p>
               <p><strong>بازی‌های کامل:</strong> {currentUser.completed_crossword_games || 0}</p>
               <p><strong>بازی‌های ناتمام:</strong> {currentUser.incomplete_crossword_games || 0}</p>
