@@ -1,6 +1,10 @@
+import { neon } from '@neondatabase/serverless';
+
+const sql = neon(process.env.DATABASE_URL);
+
 export async function POST(request) {
   try {
-    const { gameId, userId } = await request.json(); // finalScore رو حذف کن
+    const { gameId, userId } = await request.json();
     
     console.log('🎯 Marking game as completed for user:', userId);
 
@@ -14,7 +18,7 @@ export async function POST(request) {
       WHERE id = ${gameId}
     `;
 
-    // فقط وضعیت کاربر رو آپدیت کن (امتیازها قبلاً اضافه شدن)
+    // فقط وضعیت کاربر رو آپدیت کن
     await sql`
       UPDATE user_profiles 
       SET 
