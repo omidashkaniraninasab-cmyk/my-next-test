@@ -557,13 +557,13 @@ const handleInput = async (char) => {
   }
 
   if (allLocked && !gameCompleted) {
-    const finalScore = score + 50;
+    const finalScore = score; // ❌ +50 رو حذف کن - قبلاً اضافه شده
     setScore(finalScore);
     setGameCompleted(true);
     setTodayGameCompleted(true);
-    setInstantScore(0); // این خط رو اضافه کن
+    setInstantScore(0);
     
-    // تکمیل بازی در سرور - حتماً userId رو هم بفرست
+    // تکمیل بازی در سرور - فقط وضعیت رو آپدیت کن، امتیاز نه
     try {
       const response = await fetch('/api/game/complete', {
         method: 'POST',
@@ -573,16 +573,13 @@ const handleInput = async (char) => {
         body: JSON.stringify({
           gameId: currentGameId,
           finalScore: finalScore,
-          userId: currentUser.id  // این خط خیلی مهمه!
+          userId: currentUser.id
         }),
       });
 
       if (response.ok) {
         console.log('✅ Game completion saved to database');
-        
-        // آپدیت اطلاعات کاربر
         await fetchUserStats(currentUser.id);
-        
       } else {
         console.error('❌ Error saving game completion');
       }
@@ -594,8 +591,7 @@ const handleInput = async (char) => {
       console.error('❌ Error completing game:', error);
     }
     
-    // ذخیره پاداش تکمیل بازی در دیتابیس
-    await updateUserScoreInDB(currentUser.id, 50);
+    
   }
 };
 
