@@ -602,18 +602,18 @@ const handleInput = async (char) => {
     await fetchUserStats(currentUser.id);
     
    
-await saveGameToHistory(currentUser.id, currentGameId, dailyPuzzle, finalScore, mistakes);
+await saveGameToHistory(currentUser.id, currentGameId, dailyPuzzle, mistakes);
 
 
 
 
-//                                                    puzzleData اضافه شد
+                                              
     
     console.log('🎉 Game completed with bonus!');
   }
 };
 
-  const saveGameToHistory = async (userId, gameId, puzzleData, score, mistakes, completionTime = null) => {
+ const saveGameToHistory = async (userId, gameId, puzzleData, mistakes) => {
   try {
     await fetch('/api/game/save-history', {
       method: 'POST',
@@ -624,12 +624,11 @@ await saveGameToHistory(currentUser.id, currentGameId, dailyPuzzle, finalScore, 
         userId: userId,
         gameId: gameId,
         puzzleData: puzzleData,
-        score: score,  // اینجا باید finalScore باشه!
-        mistakes: mistakes,
-        completionTime: completionTime
+        mistakes: mistakes
+        // score رو حذف کن - از دیتابیس گرفته میشه
       }),
     });
-    console.log('✅ Game saved to history');
+    console.log('✅ Game saved to history with today_score');
   } catch (error) {
     console.error('Error saving game history:', error);
   }
