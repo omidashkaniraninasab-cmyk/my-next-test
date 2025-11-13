@@ -26,35 +26,52 @@ export async function GET(request) {
       // ساعت ۸ شب تا ۹ شب (دقیقه ۰): بازی بسته
       console.log('⏸️ Game closed (20:00-21:00 maintenance time)');
       
-      // شمارش بازی‌های ناتمام (کد موجود...)
-      try {
-        const incompleteUsers = await neonSql`
-          SELECT DISTINCT up.id
-          FROM user_profiles up
-          INNER JOIN crossword_games cg ON up.id = cg.user_id
-          WHERE 
-            DATE(cg.started_at) = CURRENT_DATE 
-            AND cg.completed = FALSE
-            AND up.today_game_completed = FALSE
-        `;
-        
-        console.log(`📊 Found ${incompleteUsers.length} incomplete games today`);
-        
-        for (const user of incompleteUsers) {
-          await incrementIncompleteGames(user.id);
-        }
-        
-        await neonSql`
-          UPDATE user_profiles
-          SET today_game_completed = TRUE
-          WHERE id IN (${incompleteUsers.map(u => u.id).join(',')})
-        `;
-        
-        console.log('🔒 All incomplete games locked');
-      } catch (dbError) {
-        console.error('⚠️ Error processing incomplete games:', dbError);
-      }
-      
+    // بخش شمارش بازی‌های ناتمام - نسخه اصلاح شده و درست
+try {
+  console.log('🔍 Checking for incomplete games...');
+  
+  // فقط کاربرانی که واقعاً بازی ناتمام دارن امروز
+  const incompleteUsers = await neonSql`
+    SELECT up.id, up.username
+    FROM user_profiles up
+    WHERE EXISTS (
+      SELECT 1 
+      FROM crossword_games cg 
+      WHERE cg.user_id = up.id 
+      AND DATE(cg.started_at) = CURRENT_DATE 
+      AND cg.completed = FALSE
+      AND cg.id IS NOT NULL
+    )
+    AND up.today_game_completed = FALSE
+  `;
+  
+  console.log(`📊 Found ${incompleteUsers.length} users with ACTIVE incomplete games today`);
+  
+  // فقط برای کاربرانی که واقعاً بازی ناتمام دارن
+  const userIds = incompleteUsers.map(u => u.id);
+  if (userIds.length > 0) {
+    console.log('👥 Users with incomplete games:', incompleteUsers.map(u => u.username));
+    
+    for (const user of incompleteUsers) {
+      await incrementIncompleteGames(user.id);
+      console.log(`✅ Incomplete game counted for user: ${user.username} (${user.id})`);
+    }
+    
+    // فقط این کاربران رو mark کن
+    await neonSql`
+      UPDATE user_profiles 
+      SET today_game_completed = TRUE 
+      WHERE id IN (${userIds.join(',')})
+    `;
+    
+    console.log(`🔒 Marked ${userIds.length} users as completed (incomplete games)`);
+  } else {
+    console.log('ℹ️ No users with incomplete games found');
+  }
+  
+} catch (dbError) {
+  console.error('⚠️ Error processing incomplete games:', dbError);
+}
       return Response.json({ 
         closed: true,
         message: '🎯 بازی در حال به‌روزرسانی است',

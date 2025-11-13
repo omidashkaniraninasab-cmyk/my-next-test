@@ -1661,32 +1661,39 @@ const getMotivationalMessage = (accuracy) => {
   )}
 
   {/* پیام بعد از اتمام بازی - کاربر امروز بازی کرده */}
-  {(todayGameCompleted || gameCompleted) && currentUser && (
-    <div style={{ 
-      padding: '40px', 
-      textAlign: 'center', 
-      backgroundColor: '#e8f5e8', 
-      borderRadius: '10px',
-      marginBottom: '20px'
-    }}>
-      <h3>✅ بازی امروز تکمیل شد!</h3>
-      <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '10px 0' }}>
-        🎯 امتیاز شما امروز: <strong>{currentUser.today_crossword_score}</strong>
-      </p>
-      <p style={{ margin: '10px 0', color: '#666' }}>
-        ⏰ ساعت ۹ شب با جدول جدید بر می گردیم! 🎯
-      </p>
-      <div style={{ 
-        padding: '15px', 
-        backgroundColor: '#d4edda', 
-        borderRadius: '8px',
-        margin: '10px 0'
-      }}>
-        <h4>🏆 امروز بازی کردید</h4>
-        <p>می‌توانید نتایج دیگران را در رده‌بندی مشاهده کنید</p>
-      </div>
-    </div>
-  )}
+  // شرط درست برای نمایش پیغام
+{(todayGameCompleted && currentUser && !gameCompleted) && (
+  <div style={{ 
+    padding: '40px', 
+    textAlign: 'center', 
+    backgroundColor: '#fff3cd', 
+    borderRadius: '10px',
+    marginBottom: '20px'
+  }}>
+    <h3>⏸️ بازی امروز قفل شد</h3>
+    <p style={{ margin: '10px 0', color: '#666' }}>
+      شما بازی امروز رو کامل نکردید. ساعت ۹ شب با جدول جدید برگردید!
+    </p>
+  </div>
+)}
+
+{gameCompleted && currentUser && (
+  <div style={{ 
+    padding: '40px', 
+    textAlign: 'center', 
+    backgroundColor: '#e8f5e8', 
+    borderRadius: '10px',
+    marginBottom: '20px'
+  }}>
+    <h3>✅ بازی امروز تکمیل شد!</h3>
+    <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '10px 0' }}>
+      🎯 امتیاز شما امروز: <strong>{currentUser.today_crossword_score}</strong>
+    </p>
+    <p style={{ margin: '10px 0', color: '#666' }}>
+      ⏰ ساعت ۹ شب با جدول جدید بر می گردیم! 🎯
+    </p>
+  </div>
+)}
 </div>
 
 {/* لیست کاربران - مرتب شده بر اساس امتیاز کل */}
