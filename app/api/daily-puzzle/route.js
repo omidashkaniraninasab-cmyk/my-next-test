@@ -9,18 +9,25 @@ export async function GET(request) {
   try {
     // زمان به وقت ایران
     const now = new Date();
-    const tehranOffset = 3.5 * 60 * 60 * 1000;
+    const tehranOffset = 3.5 * 60 * 60 * 1000; // +3:30
     const tehranTime = new Date(now.getTime() + tehranOffset);
     
     const currentHour = tehranTime.getHours();
+    const currentMinute = tehranTime.getMinutes();
+    const today = new Date().toISOString().split('T')[0];
     
-    if (currentHour >= 20 && currentHour < 21) {
-      // ساعت ۸ تا ۹ شب: بازی بسته
-      console.log('⏸️ Game closed (20:00-21:00)');
+    console.log(`🕒 Tehran time: ${tehranTime}, Hour: ${currentHour}, Minute: ${currentMinute}`);
+    
+    // 🆕 **شرط دقیق‌تر برای ساعت ۸-۹ شب**
+    const isMaintenanceTime = (currentHour === 20) || 
+                             (currentHour === 21 && currentMinute === 0); // فقط دقیقه ۰ از ساعت ۲۱
+    
+    if (isMaintenanceTime) {
+      // ساعت ۸ شب تا ۹ شب (دقیقه ۰): بازی بسته
+      console.log('⏸️ Game closed (20:00-21:00 maintenance time)');
       
-      // ✅ مهم: بازی‌های ناتمام امروز را شمارش کن
+      // شمارش بازی‌های ناتمام (کد موجود...)
       try {
-        // تمام کاربرانی که امروز بازی شروع کردند اما کامل نکردند
         const incompleteUsers = await neonSql`
           SELECT DISTINCT up.id
           FROM user_profiles up
@@ -33,13 +40,10 @@ export async function GET(request) {
         
         console.log(`📊 Found ${incompleteUsers.length} incomplete games today`);
         
-        // ✅ برای هر کاربر ناتمام +1 کن
         for (const user of incompleteUsers) {
           await incrementIncompleteGames(user.id);
-          console.log(`✅ Incomplete game marked for user: ${user.id}`);
         }
         
-        // ✅ بازی‌های ناتمام را lock کن (today_game_completed = TRUE)
         await neonSql`
           UPDATE user_profiles
           SET today_game_completed = TRUE
@@ -56,15 +60,36 @@ export async function GET(request) {
         message: '🎯 بازی در حال به‌روزرسانی است',
         description: 'ساعت ۹ شب با جدول جدید بر می گردیم!',
         nextOpenTime: '۲۱:۰۰'
-      }, { status: 423 }); // 423 = Locked
+      }, { status: 423 });
     }
     
-    // خارج از ساعت ۸-۹: بازی باز
-    console.log('✅ Game open - serving puzzle');
-    return Response.json(dailyPuzzleData);
+    // 🆕 **بازی باز - پازل امروز رو برگردون**
+    console.log('✅ Game open - serving today\'s puzzle');
+    
+    try {
+      // اول از دیتابیس چک کن
+      const todayPuzzle = await neonSql`
+        SELECT * FROM daily_puzzles 
+        WHERE date = ${today} 
+        AND is_active = true
+        LIMIT 1
+      `;
+      
+      if (todayPuzzle.length > 0) {
+        console.log('✅ Today\'s puzzle found in database');
+        return Response.json(todayPuzzle[0].puzzle_data);
+      } else {
+        console.log('❌ No puzzle found for today, using fallback');
+        return Response.json(dailyPuzzleData);
+      }
+      
+    } catch (dbError) {
+      console.error('❌ Database error, using fallback:', dbError);
+      return Response.json(dailyPuzzleData);
+    }
     
   } catch (error) {
     console.error('❌ Error serving daily puzzle:', error);
-    return Response.json({ error: 'Failed to load puzzle' }, { status: 500 });
+    return Response.json(dailyPuzzleData);
   }
 }

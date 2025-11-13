@@ -164,37 +164,47 @@ useEffect(() => {
   
 
   const loadDailyPuzzle = async () => {
-    try {
-      setPuzzleLoading(true);
-      console.log('🎯 Loading daily puzzle...');
+  try {
+    setPuzzleLoading(true);
+    console.log('🎯 Loading daily puzzle...');
+    
+    const response = await fetch('/api/daily-puzzle');
+    
+    if (response.status === 423) {
+      // بازی قفله - auto-refresh بعد از ۱ دقیقه
+      const closedData = await response.json();
+      setDailyPuzzle({
+        closed: true,
+        title: closedData.message,
+        description: closedData.description,
+        nextOpenTime: closedData.nextOpenTime
+      });
       
-      const response = await fetch('/api/daily-puzzle');
+      console.log('⏸️ Game is closed, will retry in 1 minute...');
       
-      if (response.status === 423) {
-        const closedData = await response.json();
-        setDailyPuzzle({
-          closed: true,
-          title: closedData.message,
-          description: closedData.description,
-          nextOpenTime: closedData.nextOpenTime
-        });
-        console.log('⏸️ Game is closed until 21:00');
-      } else if (response.ok) {
-        const puzzleData = await response.json();
-        setDailyPuzzle(puzzleData);
-        console.log('✅ Daily puzzle loaded');
-      } else {
-        throw new Error('Failed to load puzzle');
-      }
+      // 🆕 auto-refresh بعد از ۱ دقیقه
+      setTimeout(() => {
+        console.log('🔄 Auto-refreshing puzzle...');
+        loadDailyPuzzle();
+      }, 60000); // 1 دقیقه
       
-    } catch (error) {
-      console.error('💥 Error loading daily puzzle:', error);
-      const puzzleModule = await import('@/lib/dailyPuzzleData');
-      setDailyPuzzle(puzzleModule.dailyPuzzleData);
-    } finally {
-      setPuzzleLoading(false);
+    } else if (response.ok) {
+      // بازی بازه
+      const puzzleData = await response.json();
+      setDailyPuzzle(puzzleData);
+      console.log('✅ Daily puzzle loaded');
+    } else {
+      throw new Error('Failed to load puzzle');
     }
-  };
+    
+  } catch (error) {
+    console.error('💥 Error loading daily puzzle:', error);
+    const puzzleModule = await import('@/lib/dailyPuzzleData');
+    setDailyPuzzle(puzzleModule.dailyPuzzleData);
+  } finally {
+    setPuzzleLoading(false);
+  }
+};
 
   const initializeGame = () => {
     if (!dailyPuzzle) {
