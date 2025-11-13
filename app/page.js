@@ -58,6 +58,18 @@ export default function HomePage() {
   const [instantScore, setInstantScore] = useState(0);
   const [firstInputSent, setFirstInputSent] = useState(false);
   const [userLevel, setUserLevel] = useState({ level: 1, xp: 0, title: 'تازه‌کار' });
+  const [dailyPerformance, setDailyPerformance] = useState({
+  accuracy: 0,
+  errorRate: 0, 
+  dailyLevel: 0,
+  totalCells: 0,
+  correctCells: 0,
+  wrongCells: 0,
+  totalMistakes: 0,
+  uniqueWrongCells: 0
+});
+const [mistakeHistory, setMistakeHistory] = useState({});
+
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -91,7 +103,11 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
-
+// در useEffect یا وقتی بازی آپدیت می‌شه
+useEffect(() => {
+  const performance = calculateDailyPerformance();
+  setDailyPerformance(performance);
+}, [cellStatus, dailyPuzzle]);
 // تابع برای گرفتن اطلاعات سطح
 const fetchUserLevel = async (userId) => {
   try {
@@ -143,6 +159,9 @@ useEffect(() => {
       return false;
     }
   };
+
+
+  
 
   const loadDailyPuzzle = async () => {
     try {
@@ -548,7 +567,7 @@ useEffect(() => {
     scoreToAdd = 3;
     newInstantScore = instantScore + scoreToAdd;
     
-    // 🆕 **اضافه کردن XP برای خانه درست - بدون حذف کدهای موجود**
+    // 🆕 **اضافه کردن XP برای خانه درست**
     try {
       const xpResponse = await fetch('/api/user/level', {
         method: 'POST',
@@ -579,11 +598,24 @@ useEffect(() => {
     scoreToAdd = -3;
     newInstantScore = instantScore + scoreToAdd;
     setMistakes(mistakes + 1);
+    
+    // 🆕 **ثبت اشتباه در تاریخچه**
+    const cellKey = `${row}-${col}`;
+    setMistakeHistory(prev => ({
+      ...prev,
+      [cellKey]: (prev[cellKey] || 0) + 1 // شمارش تعداد اشتباهات در هر خانه
+    }));
+    console.log('📝 Mistake recorded in history for cell:', cellKey);
   }
 
   setScore(score + scoreToAdd);
   setInstantScore(newInstantScore);
   setCellStatus(newCellStatus);
+
+  // 🆕 **بروزرسانی عملکرد روزانه بعد از هر حرکت**
+  const updatedPerformance = calculateDailyPerformance();
+  setDailyPerformance(updatedPerformance);
+  console.log('📊 Daily performance updated:', updatedPerformance);
 
   await saveGameStateToServer(newInput, newCellStatus, score + scoreToAdd, mistakes + (isCorrect ? 0 : 1));
 
@@ -798,6 +830,92 @@ useEffect(() => {
       console.error('Error checking game status:', error);
     }
   };
+
+
+// تابع محاسبه عملکرد روزانه با درنظرگیری تاریخچه اشتباهات
+const calculateDailyPerformance = () => {
+  if (!dailyPuzzle) return { 
+    accuracy: 0, 
+    errorRate: 0, 
+    dailyLevel: 0, 
+    totalCells: 0, 
+    correctCells: 0, 
+    wrongCells: 0,
+    totalMistakes: 0,
+    uniqueWrongCells: 0
+  };
+  
+  const totalCells = dailyPuzzle.grid.flat().filter(cell => cell === 1).length;
+  const correctCells = cellStatus.flat().filter(status => status === 'locked').length;
+  
+  // خانه‌های currently wrong
+  const currentWrongCells = cellStatus.flat().filter(status => status === 'wrong').length;
+  
+  // 🆕 کل اشتباهات (تعداد دفعات اشتباه)
+  const totalMistakes = Object.values(mistakeHistory).reduce((sum, count) => sum + count, 0);
+  
+  // خانه‌های منحصر به فردی که کاربر در آنها اشتباه کرده
+  const uniqueWrongCells = new Set([
+    ...Object.keys(mistakeHistory),
+    ...cellStatus.flatMap((row, rowIndex) => 
+      row.map((cell, colIndex) => 
+        cell === 'wrong' ? `${rowIndex}-${colIndex}` : null
+      ).filter(Boolean)
+    )
+  ]).size;
+
+  // 🆕 فرمول جدید دقت: (خانه‌های درست - کل اشتباهات) / کل خانه‌ها × ۱۰۰
+  const accuracy = totalCells > 0 ? 
+    Math.max(0, (correctCells - totalMistakes) / totalCells * 100) : 0;
+  
+  // درصد خطا براساس خانه‌های منحصر به فرد اشتباه
+  const errorRate = totalCells > 0 ? (uniqueWrongCells / totalCells) * 100 : 0;
+  
+  const dailyLevel = Math.max(0, 100 - errorRate);
+  
+  return {
+    accuracy: Math.round(accuracy),
+    errorRate: Math.round(errorRate),
+    dailyLevel: Math.round(dailyLevel),
+    totalCells,
+    correctCells,
+    wrongCells: currentWrongCells,
+    totalMistakes, // 🆕 اینجا فقط تعداد دفعات اشتباهه
+    uniqueWrongCells
+  };
+};
+
+// تابع برای عنوان عملکرد
+// تابع برای عنوان عملکرد - براساس دقت
+const getPerformanceTitle = (accuracy) => {
+  if (accuracy >= 90) return 'استاد';
+  if (accuracy >= 80) return 'حرفه‌ای';
+  if (accuracy >= 70) return 'ماهر';
+  if (accuracy >= 60) return 'متوسط';
+  if (accuracy >= 50) return 'مبتدی';
+  return 'تازه‌کار';
+};
+
+// تابع برای توضیح عملکرد
+const getPerformanceDescription = (dailyLevel) => {
+  if (dailyLevel >= 90) return 'عملکرد درخشان!';
+  if (dailyLevel >= 80) return 'خیلی عالی!';
+  if (dailyLevel >= 70) return 'خوب بازی کردی';
+  if (dailyLevel >= 60) return 'قابل قبول';
+  if (dailyLevel >= 50) return 'نیاز به تمرین';
+  return 'تمرین بیشتر نیاز داری';
+};
+
+// تابع برای پیام انگیزشی - براساس دقت
+const getMotivationalMessage = (accuracy) => {
+  if (accuracy >= 90) return '🎯 شگفت‌انگیز! دقتت فوق‌العاده است!';
+  if (accuracy >= 80) return '💫 عالی! خیلی دقیق بازی می‌کنی';
+  if (accuracy >= 70) return '⭐ خوبه، می‌تونی بهتر هم بشی';
+  if (accuracy >= 60) return '📈 آفرین، در مسیر پیشرفتی';
+  if (accuracy >= 50) return '🎮 ادامه بده، تمرین کن تا دقیق‌تر بشی';
+  return '💪 ناامید نشو، با تمرین دقتت بهتر می‌شه';
+};
+
 
   const persianKeyboard = [
     ['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج', 'چ'],
@@ -1221,7 +1339,7 @@ useEffect(() => {
 
 
 
-{/* 🆕 منوی اختصاصی: پیشرفت و سطح */}
+{/* 🆕 منوی اختصاصی: کارنامه روزانه - بدون سطح روز */}
 {currentUser && (
   <div style={{ 
     marginBottom: '40px', 
@@ -1240,76 +1358,25 @@ useEffect(() => {
     }}>
       <div>
         <h2 style={{ margin: '0 0 10px 0', fontSize: '24px', color: 'white' }}>
-          📊 پیشرفت و سطح
+          📊 کارنامه روزانه
         </h2>
         <p style={{ margin: 0, opacity: 0.9, fontSize: '14px', color: 'white' }}>
-          مسیر پیشرفت شما در بازی کراسورد
+          عملکرد امروز شما در بازی کراسورد
         </p>
       </div>
       
-      <div style={{
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        padding: '8px 16px',
-        borderRadius: '20px',
-        fontSize: '18px',
-        fontWeight: 'bold',
-        color: 'white'
-      }}>
-        سطح {userLevel.level}
-      </div>
+      {/* 🗑️ حذف بخش سطح روز از هدر */}
     </div>
 
-    {/* نوار پیشرفت اصلی */}
-    <div style={{ marginBottom: '25px' }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        marginBottom: '10px',
-        fontSize: '14px',
-        color: 'white'
-      }}>
-        <span>🎯 {userLevel.title}</span>
-        <span style={{ color: 'white' }}>
-          {userLevel.xp} امتیاز 
-          {userLevel.level < 15 && ` / ${LEVEL_SYSTEM[userLevel.level + 1]?.xpRequired} امتیاز`}
-        </span>
-      </div>
-      <div style={{
-        width: '100%',
-        height: '25px',
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        border: '2px solid rgba(255,255,255,0.3)'
-      }}>
-        <div style={{
-          width: `${userLevel.level < 15 ? (userLevel.xp / LEVEL_SYSTEM[userLevel.level + 1]?.xpRequired) * 100 : 100}%`,
-          height: '100%',
-          background: 'linear-gradient(90deg, #10b981, #059669)',
-          transition: 'width 0.5s ease',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          paddingRight: '10px',
-          fontSize: '12px',
-          fontWeight: 'bold',
-          color: 'white'
-        }}>
-          {userLevel.level < 15 ? 
-            `${Math.round((userLevel.xp / LEVEL_SYSTEM[userLevel.level + 1]?.xpRequired) * 100)}%` : 
-            '💯 کامل'
-          }
-        </div>
-      </div>
-    </div>
+    {/* 🗑️ حذف نوار پیشرفت سطح روز */}
 
-    {/* کارت‌های اطلاعات */}
+    {/* کارت‌های اطلاعات - آمار دقیق */}
     <div style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
       gap: '15px'
     }}>
-      {/* کارت امتیاز کل */}
+      {/* کارت دقت */}
       <div style={{
         backgroundColor: 'rgba(255,255,255,0.15)',
         padding: '15px',
@@ -1319,31 +1386,17 @@ useEffect(() => {
         color: 'white'
       }}>
         <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
-          🎯 امتیاز کل
+          ✅ دقت پاسخ‌ها
         </div>
         <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
-          {userLevel.xp}
+          {dailyPerformance.accuracy}%
+        </div>
+        <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
+          {dailyPerformance.correctCells} از {dailyPerformance.totalCells} خانه
         </div>
       </div>
 
-      {/* کارت سطح بعدی */}
-      <div style={{
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        padding: '15px',
-        borderRadius: '1010px',
-        textAlign: 'center',
-        border: '1px solid rgba(255,255,255,0.3)',
-        color: 'white'
-      }}>
-        <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
-          ⭐ سطح بعدی
-        </div>
-        <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
-          {userLevel.level < 15 ? LEVEL_SYSTEM[userLevel.level + 1]?.title : '🎊 ماکسیموم'}
-        </div>
-      </div>
-
-      {/* کارت امتیاز مورد نیاز */}
+      {/* کارت خطا */}
       <div style={{
         backgroundColor: 'rgba(255,255,255,0.15)',
         padding: '15px',
@@ -1353,13 +1406,33 @@ useEffect(() => {
         color: 'white'
       }}>
         <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
-          📈 امتیاز مورد نیاز
+          ❌ خانه‌های اشتباه
         </div>
-        <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
-          {userLevel.level < 15 ? 
-            (LEVEL_SYSTEM[userLevel.level + 1].xpRequired - userLevel.xp) + ' امتیاز' : 
-            '۰ امتیاز'
-          }
+        <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
+          {dailyPerformance.uniqueWrongCells}
+        </div>
+        <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
+          از {dailyPerformance.totalCells} خانه
+        </div>
+      </div>
+
+      {/* کارت اشتباهات کل */}
+      <div style={{
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        padding: '15px',
+        borderRadius: '10px',
+        textAlign: 'center',
+        border: '1px solid rgba(255,255,255,0.3)',
+        color: 'white'
+      }}>
+        <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
+          🔄 کل اشتباهات
+        </div>
+        <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
+          {dailyPerformance.totalMistakes}
+        </div>
+        <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
+          تعداد دفعات اشتباه
         </div>
       </div>
 
@@ -1373,32 +1446,32 @@ useEffect(() => {
         color: 'white'
       }}>
         <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
-          🏆 جایگاه شما
+          🏆 جایگاه
         </div>
         <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
-          {userLevel.title}
+          {getPerformanceTitle(dailyPerformance.accuracy)}
+        </div>
+        <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
+          {getPerformanceDescription(dailyPerformance.accuracy)}
         </div>
       </div>
     </div>
 
     {/* پیام انگیزشی */}
-    {userLevel.level < 15 && (
-      <div style={{
-        marginTop: '20px',
-        padding: '15px',
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        borderRadius: '10px',
-        textAlign: 'center',
-        fontSize: '14px',
-        border: '1px solid rgba(255,255,255,0.3)',
-        color: 'white'
-      }}>
-        🎮 فقط {LEVEL_SYSTEM[userLevel.level + 1].xpRequired - userLevel.xp} امتیاز تا سطح {userLevel.level + 1} فاصله داری!
-      </div>
-    )}
+    <div style={{
+      marginTop: '20px',
+      padding: '15px',
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      borderRadius: '10px',
+      textAlign: 'center',
+      fontSize: '14px',
+      border: '1px solid rgba(255,255,255,0.3)',
+      color: 'white'
+    }}>
+      {getMotivationalMessage(dailyPerformance.accuracy)}
+    </div>
   </div>
 )}
-
 
 
       {/* نمودارهای پیشرفت */}
