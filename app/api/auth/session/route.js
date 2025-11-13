@@ -2,21 +2,16 @@ import { getSession, debugSessions } from '@/lib/auth';
 
 export async function GET(request) {
   try {
-    // دریافت sessionId از cookie - تصحیح شده
     const cookieHeader = request.headers.get('cookie');
     console.log('🍪 All cookies:', cookieHeader);
     
-    // روش درست برای استخراج session از کوکی
     const sessionId = cookieHeader
       ?.split(';')
       .map(cookie => cookie.trim())
       .find(cookie => cookie.startsWith('session='))
       ?.split('=')[1];
 
-    console.log('🔑 Correctly extracted sessionId:', sessionId);
-
-    // دیباگ: همه sessionهای اخیر رو ببین
-    const recentSessions = await debugSessions();
+    console.log('🔑 Extracted sessionId:', sessionId);
 
     if (!sessionId) {
       console.log('❌ No sessionId found in cookies');
@@ -27,14 +22,16 @@ export async function GET(request) {
     
     console.log('📦 Session data from DB:', session);
     
-    if (session && session.user) {
-      console.log('✅ User session found:', session.user.username);
+    if (session && session.sessionData && session.sessionData.user) {
+      console.log('✅ User session found:', session.sessionData.user.username);
       return Response.json({ 
-        user: session.user 
+        success: true,
+        user: session.sessionData.user 
       });
     } else {
       console.log('❌ No valid session found in database');
       return Response.json({ 
+        success: false,
         user: null 
       });
     }
@@ -42,6 +39,7 @@ export async function GET(request) {
   } catch (error) {
     console.error('💥 Session error:', error);
     return Response.json({ 
+      success: false,
       user: null,
       error: error.message 
     });
