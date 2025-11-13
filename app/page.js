@@ -1,8 +1,29 @@
 'use client';
+
+
 import { useState, useEffect } from 'react';
 import { getSessionFromCookie, logout } from '@/lib/client-auth';
 import ProgressChart from '../components/ProgressChart';
 import GameHistory from '../components/GameHistory';
+
+const LEVEL_SYSTEM = {
+  1: { xpRequired: 0, title: "تازه‌کار" },
+  2: { xpRequired: 100, title: "مبتدی" },
+  3: { xpRequired: 300, title: "علاقه‌مند" },
+  4: { xpRequired: 600, title: "منظم" },
+  5: { xpRequired: 1000, title: "حرفه‌ای" },
+  6: { xpRequired: 1500, title: "ماهر" },
+  7: { xpRequired: 2100, title: "استاد" },
+  8: { xpRequired: 2800, title: "ارشد" },
+  9: { xpRequired: 3600, title: "خبره" },
+  10: { xpRequired: 4500, title: "اسطوره" },
+  11: { xpRequired: 5500, title: "افسانه" },
+  12: { xpRequired: 6600, title: "قهرمان" },
+  13: { xpRequired: 7800, title: "نابغه" },
+  14: { xpRequired: 9100, title: "شاهکار" },
+  15: { xpRequired: 10500, title: "بی‌نظیر" }
+};
+
 
 export default function HomePage() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -456,7 +477,7 @@ useEffect(() => {
     }
   };
 
-  const handleInput = async (char) => {
+ const handleInput = async (char) => {
   console.log('🎮 handleInput called with char:', char);
   console.log('🔍 Current state:', {
     gameCompleted,
@@ -526,6 +547,33 @@ useEffect(() => {
     newCellStatus[row][col] = 'locked';
     scoreToAdd = 3;
     newInstantScore = instantScore + scoreToAdd;
+    
+    // 🆕 **اضافه کردن XP برای خانه درست - بدون حذف کدهای موجود**
+    try {
+      const xpResponse = await fetch('/api/user/level', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          xp: 10, // XP برای هر خانه درست
+          reason: 'پر کردن خانه کراسورد'
+        })
+      });
+      
+      if (xpResponse.ok) {
+        const xpResult = await xpResponse.json();
+        console.log('✅ XP added for correct cell:', xpResult);
+        
+        // بروزرسانی منوی پیشرفت
+        await fetchUserLevel(currentUser.id);
+      } else {
+        console.error('❌ XP API error:', xpResponse.status);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error adding XP:', error);
+    }
+    
   } else {
     newCellStatus[row][col] = 'wrong';
     scoreToAdd = -3;
@@ -595,69 +643,89 @@ useEffect(() => {
   };
 
   const checkGameCompletion = async () => {
-    if (!dailyPuzzle) return;
-    
-    let allLocked = true;
-    
-    for (let i = 0; i < dailyPuzzle.size; i++) {
-      for (let j = 0; j < dailyPuzzle.size; j++) {
-        if (dailyPuzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
-          allLocked = false;
-          break;
-        }
+  if (!dailyPuzzle) return;
+  
+  let allLocked = true;
+  
+  for (let i = 0; i < dailyPuzzle.size; i++) {
+    for (let j = 0; j < dailyPuzzle.size; j++) {
+      if (dailyPuzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
+        allLocked = false;
+        break;
       }
-      if (!allLocked) break;
+    }
+    if (!allLocked) break;
+  }
+
+  if (allLocked && !gameCompleted) {
+    const bonusScore = 50;
+    const finalScore = score + bonusScore;
+    
+    setScore(finalScore);
+    setGameCompleted(true);
+    setTodayGameCompleted(true);
+    setInstantScore(0);
+    
+    try {
+      await fetch('/api/users/update-score', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          additionalScore: bonusScore,
+          currentInstantScore: 0
+        }),
+      });
+      console.log('✅ Bonus score added');
+    } catch (error) {
+      console.error('❌ Error adding bonus:', error);
     }
 
-    if (allLocked && !gameCompleted) {
-      const bonusScore = 50;
-      const finalScore = score + bonusScore;
-      
-      setScore(finalScore);
-      setGameCompleted(true);
-      setTodayGameCompleted(true);
-      setInstantScore(0);
-      
-      try {
-        await fetch('/api/users/update-score', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: currentUser.id,
-            additionalScore: bonusScore,
-            currentInstantScore: 0
-          }),
-        });
-        console.log('✅ Bonus score added');
-      } catch (error) {
-        console.error('❌ Error adding bonus:', error);
-      }
-
-      try {
-        await fetch('/api/game/complete', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            gameId: currentGameId,
-            finalScore: finalScore,
-            userId: currentUser.id
-          }),
-        });
-        console.log('✅ Game status completed');
-      } catch (error) {
-        console.error('❌ Error completing game status:', error);
-      }
-
-      await fetchUserStats(currentUser.id);
-      await saveGameToHistory(currentUser.id, currentGameId, dailyPuzzle, mistakes);
-      
-      console.log('🎉 Game completed with bonus!');
+    try {
+      await fetch('/api/game/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          gameId: currentGameId,
+          finalScore: finalScore,
+          userId: currentUser.id
+        }),
+      });
+      console.log('✅ Game status completed');
+    } catch (error) {
+      console.error('❌ Error completing game status:', error);
     }
-  };
+
+    // 🆕 **اضافه کردن XP برای بازی کامل - بدون حذف کدهای موجود**
+    try {
+      await fetch('/api/user/level', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          xp: 100, // XP برای بازی کامل
+          reason: 'اتمام بازی کراسورد'
+        })
+      });
+      console.log('✅ XP added for game completion');
+      
+      // بروزرسانی منوی پیشرفت
+      await fetchUserLevel(currentUser.id);
+      
+    } catch (error) {
+      console.error('❌ Error adding XP:', error);
+    }
+
+    await fetchUserStats(currentUser.id);
+    await saveGameToHistory(currentUser.id, currentGameId, dailyPuzzle, mistakes);
+    
+    console.log('🎉 Game completed with bonus!');
+  }
+};
 
   const saveGameToHistory = async (userId, gameId, puzzleData, mistakes) => {
     try {
@@ -1150,6 +1218,188 @@ useEffect(() => {
           </div>
         </div>
       )}
+
+
+
+{/* 🆕 منوی اختصاصی: پیشرفت و سطح */}
+{currentUser && (
+  <div style={{ 
+    marginBottom: '40px', 
+    padding: '25px', 
+    background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+    borderRadius: '15px',
+    boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+    color: 'white',
+    border: '2px solid #8b5cf6'
+  }}>
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: '20px'
+    }}>
+      <div>
+        <h2 style={{ margin: '0 0 10px 0', fontSize: '24px', color: 'white' }}>
+          📊 پیشرفت و سطح
+        </h2>
+        <p style={{ margin: 0, opacity: 0.9, fontSize: '14px', color: 'white' }}>
+          مسیر پیشرفت شما در بازی کراسورد
+        </p>
+      </div>
+      
+      <div style={{
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        padding: '8px 16px',
+        borderRadius: '20px',
+        fontSize: '18px',
+        fontWeight: 'bold',
+        color: 'white'
+      }}>
+        سطح {userLevel.level}
+      </div>
+    </div>
+
+    {/* نوار پیشرفت اصلی */}
+    <div style={{ marginBottom: '25px' }}>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        marginBottom: '10px',
+        fontSize: '14px',
+        color: 'white'
+      }}>
+        <span>🎯 {userLevel.title}</span>
+        <span style={{ color: 'white' }}>
+          {userLevel.xp} امتیاز 
+          {userLevel.level < 15 && ` / ${LEVEL_SYSTEM[userLevel.level + 1]?.xpRequired} امتیاز`}
+        </span>
+      </div>
+      <div style={{
+        width: '100%',
+        height: '25px',
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        border: '2px solid rgba(255,255,255,0.3)'
+      }}>
+        <div style={{
+          width: `${userLevel.level < 15 ? (userLevel.xp / LEVEL_SYSTEM[userLevel.level + 1]?.xpRequired) * 100 : 100}%`,
+          height: '100%',
+          background: 'linear-gradient(90deg, #10b981, #059669)',
+          transition: 'width 0.5s ease',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingRight: '10px',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          color: 'white'
+        }}>
+          {userLevel.level < 15 ? 
+            `${Math.round((userLevel.xp / LEVEL_SYSTEM[userLevel.level + 1]?.xpRequired) * 100)}%` : 
+            '💯 کامل'
+          }
+        </div>
+      </div>
+    </div>
+
+    {/* کارت‌های اطلاعات */}
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+      gap: '15px'
+    }}>
+      {/* کارت امتیاز کل */}
+      <div style={{
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        padding: '15px',
+        borderRadius: '10px',
+        textAlign: 'center',
+        border: '1px solid rgba(255,255,255,0.3)',
+        color: 'white'
+      }}>
+        <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
+          🎯 امتیاز کل
+        </div>
+        <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
+          {userLevel.xp}
+        </div>
+      </div>
+
+      {/* کارت سطح بعدی */}
+      <div style={{
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        padding: '15px',
+        borderRadius: '1010px',
+        textAlign: 'center',
+        border: '1px solid rgba(255,255,255,0.3)',
+        color: 'white'
+      }}>
+        <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
+          ⭐ سطح بعدی
+        </div>
+        <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
+          {userLevel.level < 15 ? LEVEL_SYSTEM[userLevel.level + 1]?.title : '🎊 ماکسیموم'}
+        </div>
+      </div>
+
+      {/* کارت امتیاز مورد نیاز */}
+      <div style={{
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        padding: '15px',
+        borderRadius: '10px',
+        textAlign: 'center',
+        border: '1px solid rgba(255,255,255,0.3)',
+        color: 'white'
+      }}>
+        <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
+          📈 امتیاز مورد نیاز
+        </div>
+        <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
+          {userLevel.level < 15 ? 
+            (LEVEL_SYSTEM[userLevel.level + 1].xpRequired - userLevel.xp) + ' امتیاز' : 
+            '۰ امتیاز'
+          }
+        </div>
+      </div>
+
+      {/* کارت جایگاه */}
+      <div style={{
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        padding: '15px',
+        borderRadius: '10px',
+        textAlign: 'center',
+        border: '1px solid rgba(255,255,255,0.3)',
+        color: 'white'
+      }}>
+        <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
+          🏆 جایگاه شما
+        </div>
+        <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
+          {userLevel.title}
+        </div>
+      </div>
+    </div>
+
+    {/* پیام انگیزشی */}
+    {userLevel.level < 15 && (
+      <div style={{
+        marginTop: '20px',
+        padding: '15px',
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        borderRadius: '10px',
+        textAlign: 'center',
+        fontSize: '14px',
+        border: '1px solid rgba(255,255,255,0.3)',
+        color: 'white'
+      }}>
+        🎮 فقط {LEVEL_SYSTEM[userLevel.level + 1].xpRequired - userLevel.xp} امتیاز تا سطح {userLevel.level + 1} فاصله داری!
+      </div>
+    )}
+  </div>
+)}
+
+
 
       {/* نمودارهای پیشرفت */}
       <ProgressChart users={users} currentUser={currentUser} />

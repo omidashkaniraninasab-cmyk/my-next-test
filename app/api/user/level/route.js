@@ -1,33 +1,23 @@
-// import { getUserLevel, addUserXP } from '@/lib/db'; // این رو کامنت کن
-
-// توابع تستی
-const getUserLevel = async (userId) => ({
-  level: 1,
-  xp: 0,
-  title: 'تازه‌کار',
-  achievements: []
-});
-
-const addUserXP = async (userId, xpToAdd, reason) => ({
-  leveledUp: false,
-  oldLevel: 1,
-  newLevel: 1,
-  oldXP: 0,
-  newXP: xpToAdd,
-  title: 'تازه‌کار'
-});
+import { getUserLevel, addUserXP } from '@/lib/db';
 
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     
+    console.log('🎯 Level API called for user:', userId);
+    
     if (!userId) {
       return Response.json({ error: 'UserId required' }, { status: 400 });
     }
     
     const userLevel = await getUserLevel(userId);
-    return Response.json({ success: true, level: userLevel });
+    console.log('✅ Returning real level data:', userLevel);
+    
+    return Response.json({ 
+      success: true, 
+      level: userLevel
+    });
     
   } catch (error) {
     console.error('Level API error:', error);
@@ -43,7 +33,9 @@ export async function POST(request) {
       return Response.json({ error: 'UserId and XP required' }, { status: 400 });
     }
     
-    const result = await addUserXP(userId, xp, reason || 'دستی');
+    const result = await addUserXP(userId, xp, reason || 'سیستم بازی');
+    console.log('✅ Real XP added:', result);
+    
     return Response.json({ success: true, result });
     
   } catch (error) {
