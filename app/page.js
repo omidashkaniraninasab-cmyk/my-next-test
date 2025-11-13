@@ -742,7 +742,7 @@ useEffect(() => {
       console.error('❌ Error completing game status:', error);
     }
 
-    // 🆕 **اضافه کردن XP برای بازی کامل - بدون حذف کدهای موجود**
+    // 🆕 **اضافه کردن XP برای بازی کامل**
     try {
       await fetch('/api/user/level', {
         method: 'POST',
@@ -754,40 +754,96 @@ useEffect(() => {
         })
       });
       console.log('✅ XP added for game completion');
-      
-      // بروزرسانی منوی پیشرفت
-      await fetchUserLevel(currentUser.id);
-      
     } catch (error) {
-      console.error('❌ Error adding XP:', error);
+      console.error('❌ Error adding XP for completion:', error);
     }
 
+    // 🆕 **پاداش دقت بالا**
+    const currentPerformance = calculateDailyPerformance();
+    let accuracyBonus = 0;
+    let accuracyReason = '';
+
+    if (currentPerformance.accuracy >= 90) {
+      accuracyBonus = 100;
+      accuracyReason = 'دقت استثنایی (۹۰٪+)';
+    } else if (currentPerformance.accuracy >= 80) {
+      accuracyBonus = 50;
+      accuracyReason = 'دقت عالی (۸۰٪+)';
+    } else if (currentPerformance.accuracy >= 70) {
+      accuracyBonus = 25;
+      accuracyReason = 'دقت خوب (۷۰٪+)';
+    }
+
+    if (accuracyBonus > 0) {
+      try {
+        await fetch('/api/user/level', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            xp: accuracyBonus,
+            reason: accuracyReason
+          })
+        });
+        console.log(`✅ Accuracy bonus added: ${accuracyBonus} XP for ${accuracyReason}`);
+      } catch (error) {
+        console.error('❌ Error adding accuracy bonus:', error);
+      }
+    }
+
+    // 🆕 **ذخیره تاریخچه با امتیاز امروز - بخش جدید و مهم**
+    try {
+      // اول اطلاعات تازه کاربر رو از سرور بگیر
+      const userResponse = await fetch('/api/users');
+      if (userResponse.ok) {
+        const usersData = await userResponse.json();
+        const freshUserData = usersData.find(user => user.id === currentUser.id);
+        
+        if (freshUserData) {
+          // حالا تاریخچه رو با امتیاز امروز ذخیره کن
+          await saveGameToHistory(
+            currentUser.id, 
+            currentGameId, 
+            dailyPuzzle, 
+            mistakes,
+            freshUserData.today_crossword_score // 🎯 امتیاز امروز
+          );
+          console.log('✅ Game history saved with TODAY score:', freshUserData.today_crossword_score);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error saving game history:', error);
+    }
+
+    // بروزرسانی منوی پیشرفت
+    await fetchUserLevel(currentUser.id);
     await fetchUserStats(currentUser.id);
-    await saveGameToHistory(currentUser.id, currentGameId, dailyPuzzle, mistakes);
     
     console.log('🎉 Game completed with bonus!');
   }
 };
 
-  const saveGameToHistory = async (userId, gameId, puzzleData, mistakes) => {
-    try {
-      await fetch('/api/game/save-history', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: userId,
-          gameId: gameId,
-          puzzleData: puzzleData,
-          mistakes: mistakes
-        }),
-      });
-      console.log('✅ Game saved to history with today_score');
-    } catch (error) {
-      console.error('Error saving game history:', error);
-    }
-  };
+  const saveGameToHistory = async (userId, gameId, puzzleData, mistakes, todayScore) => {
+  try {
+    await fetch('/api/game/save-history', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: userId,
+        gameId: gameId,
+        puzzleData: puzzleData,
+        score: todayScore, // 🎯 استفاده از امتیاز امروز
+        mistakes: mistakes,
+        date: new Date().toISOString()
+      }),
+    });
+    console.log('✅ Game saved to history with TODAY score:', todayScore);
+  } catch (error) {
+    console.error('Error saving game history:', error);
+  }
+};
 
   const handleLogin = async (email, password) => {
     setLoading(true);
