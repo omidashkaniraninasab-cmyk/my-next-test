@@ -36,6 +36,7 @@ export default function HomePage() {
   const [todayGameCompleted, setTodayGameCompleted] = useState(false);
   const [instantScore, setInstantScore] = useState(0);
   const [firstInputSent, setFirstInputSent] = useState(false);
+  const [userLevel, setUserLevel] = useState({ level: 1, xp: 0, title: 'تازه‌کار' });
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -68,6 +69,28 @@ export default function HomePage() {
     const interval = setInterval(fetchUsers, 10000);
     return () => clearInterval(interval);
   }, []);
+
+
+// تابع برای گرفتن اطلاعات سطح
+const fetchUserLevel = async (userId) => {
+  try {
+    const response = await fetch(`/api/user/level?userId=${userId}`);
+    if (response.ok) {
+      const data = await response.json();
+      setUserLevel(data.level);
+    }
+  } catch (error) {
+    console.error('Error fetching user level:', error);
+  }
+};
+
+// فراخوانی در useEffect وقتی کاربر لاگین می‌کنه
+useEffect(() => {
+  if (currentUser) {
+    fetchUserLevel(currentUser.id);
+  }
+}, [currentUser]);
+
 
   const restoreSession = async () => {
     try {
