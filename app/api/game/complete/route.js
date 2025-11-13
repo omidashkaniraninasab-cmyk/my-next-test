@@ -1,37 +1,45 @@
 import { neon } from '@neondatabase/serverless';
+import { incrementCompletedGames } from '@/lib/db';
 
 const sql = neon(process.env.DATABASE_URL);
 
 export async function POST(request) {
   try {
-    const { gameId, userId } = await request.json();
+    const { gameId, userId, finalScore } = await request.json();
     
     console.log('🎯 Marking game as completed for user:', userId);
 
-    // فقط وضعیت بازی رو آپدیت کن
+    // ✅ آپدیت وضعیت بازی
     await sql`
       UPDATE crossword_games 
       SET 
         completed = TRUE, 
         completed_at = CURRENT_TIMESTAMP, 
-        finished_at = CURRENT_TIMESTAMP
+        finished_at = CURRENT_TIMESTAMP,
+        score = ${finalScore}
       WHERE id = ${gameId}
     `;
 
-    // فقط وضعیت کاربر رو آپدیت کن
+    // ✅ افزایش بازی‌های کامل
+    await incrementCompletedGames(userId);
+    console.log('✅ Completed games count incremented');
+
+    // ✅ آپدیت وضعیت کاربر - بازی امروز تکمیل شد
     await sql`
       UPDATE user_profiles 
-      SET 
-        today_game_completed = TRUE
+      SET today_game_completed = TRUE
       WHERE id = ${userId}
     `;
 
-    console.log('✅ Game marked as completed');
-
-    return Response.json({ success: true });
+    return Response.json({ 
+      success: true,
+      message: 'Game completed successfully'
+    });
     
   } catch (error) {
-    console.error('❌ Error completing game:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    console.error('❌ Complete game error:', error);
+    return Response.json({ 
+      error: error.message
+    }, { status: 500 });
   }
 }

@@ -1,46 +1,48 @@
-import { createNewGame, updateGameProgress, completeGame, updateUserScore } from '@/lib/db';
+import { neon } from '@neondatabase/serverless';
+import { createNewGame, markGameStarted } from '@/lib/db';
+
+const sql = neon(process.env.DATABASE_URL);
 
 export async function POST(request) {
   try {
-    const { action, userId, gameData, score, mistakes } = await request.json();
+    const { action, userId, gameData, userProgress, gameId } = await request.json();
     
-    console.log('Game API called:', { action, userId, gameData: gameData ? 'exists' : 'missing' });
+    console.log('Game API called:', { action, userId, gameId });
 
     if (action === 'start') {
-      console.log('Starting new game for user:', userId);
+      const game = await createNewGame(userId, gameData);
+      return Response.json({ success: true, game: game });
+    } else if (action === 'first-input') {
+      console.log('🎯 first-input called with:', { gameId, userId });
       
-      // شروع بازی جدید
-      const newGame = await createNewGame(userId, gameData.puzzle);
-      console.log('New game created:', newGame.id);
-      
-      return Response.json({ success: true, game: newGame });
-    
-    } else if (action === 'update') {
-      console.log('Updating game progress:', { gameId: gameData.gameId, score, mistakes });
-      
-      // آپدیت پیشرفت بازی
-      await updateGameProgress(gameData.gameId, gameData.progress, score, mistakes);
-      return Response.json({ success: true });
-    
-    } else if (action === 'complete') {
-      console.log('Completing game:', { gameId: gameData.gameId, score });
-      
-      // تکمیل بازی
-      await completeGame(gameData.gameId, score);
-      
-      // آپدیت امتیاز کاربر
-      await updateUserScore(userId, score, score);
-      
-      return Response.json({ success: true });
-    }
+      if (!gameId || !userId) {
+        console.log('❌ Missing gameId or userId');
+        return Response.json({ error: 'gameId و userId لازم است' }, { status: 400 });
+      }
 
-    return Response.json({ error: 'Action not found' }, { status: 400 });
+      const result = await markGameStarted(gameId, userId);
+      console.log('🎯 markGameStarted result:', result);
+      
+      if (result.ok) {
+        console.log('✅ Games played incremented to:', result.newCount);
+        return Response.json({ 
+          success: true, 
+          message: 'Games played incremented', 
+          newCount: result.newCount 
+        });
+      } else {
+        console.log('ℹ️ First input already processed:', result.reason);
+        return Response.json({ 
+          success: false, 
+          reason: result.reason 
+        });
+      }
+    } else {
+      return Response.json({ error: 'Action not found' }, { status: 400 });
+    }
     
   } catch (error) {
-    console.error('Game API error details:', error);
-    return Response.json({ 
-      error: error.message,
-      stack: error.stack 
-    }, { status: 500 });
+    console.error('Game API error:', error);
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }

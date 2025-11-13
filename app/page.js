@@ -35,6 +35,7 @@ export default function HomePage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [todayGameCompleted, setTodayGameCompleted] = useState(false);
   const [instantScore, setInstantScore] = useState(0);
+  const [firstInputSent, setFirstInputSent] = useState(false);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -401,6 +402,8 @@ export default function HomePage() {
     });
   };
 
+
+
   const handleCellSelect = (row, col) => {
     if (dailyPuzzle && dailyPuzzle.grid[row][col] === 1 && cellStatus[row][col] !== 'locked' && !gameCompleted) {
       setSelectedCell([row, col]);
@@ -431,49 +434,98 @@ export default function HomePage() {
   };
 
   const handleInput = async (char) => {
-    if (gameCompleted || !currentUser || !currentGameId || !dailyPuzzle) return;
+  console.log('🎮 handleInput called with char:', char);
+  console.log('🔍 Current state:', {
+    gameCompleted,
+    hasUser: !!currentUser,
+    hasGameId: !!currentGameId,
+    hasPuzzle: !!dailyPuzzle,
+    firstInputSent,
+    selectedCell
+  });
 
-    const [row, col] = selectedCell;
-    
-    if (cellStatus[row][col] === 'locked') return;
+  if (gameCompleted || !currentUser || !currentGameId || !dailyPuzzle) {
+    console.log('❌ Blocked by conditions');
+    return;
+  }
 
-    const newInput = [...userInput];
-    newInput[row][col] = char;
-    setUserInput(newInput);
+  const [row, col] = selectedCell;
+  console.log('🎯 Selected cell:', row, col, 'status:', cellStatus[row]?.[col]);
+  
+  if (cellStatus[row]?.[col] === 'locked') {
+    console.log('❌ Cell is locked');
+    return;
+  }
 
-    const isCorrect = char === dailyPuzzle.solution[row][col];
-    const newCellStatus = [...cellStatus];
-
-    let scoreToAdd = 0;
-    let newInstantScore = instantScore;
-
-    if (isCorrect) {
-      newCellStatus[row][col] = 'locked';
-      scoreToAdd = 3;
-      newInstantScore = instantScore + scoreToAdd;
-    } else {
-      newCellStatus[row][col] = 'wrong';
-      scoreToAdd = -3;
-      newInstantScore = instantScore + scoreToAdd;
-      setMistakes(mistakes + 1);
+  // ✅ **مهم: اول first-input رو صدا بزن، بعد بقیه منطق**
+  if (!firstInputSent) {
+    console.log('🚀 Sending first-input request...');
+    try {
+      const response = await fetch('/api/game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'first-input',
+          userId: currentUser.id,
+          gameId: currentGameId
+        })
+      });
+      
+      console.log('📡 First-input response status:', response.status);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ First input recorded successfully:', result);
+        setFirstInputSent(true);
+      } else {
+        const errorText = await response.text();
+        console.error('❌ First-input API error:', response.status, errorText);
+      }
+    } catch (error) {
+      console.error('❌ Error recording first input:', error);
     }
+  } else {
+    console.log('ℹ️ First input already sent');
+  }
 
-    setScore(score + scoreToAdd);
-    setInstantScore(newInstantScore);
-    setCellStatus(newCellStatus);
+  // بقیه منطق ورود...
+  const newInput = [...userInput];
+  newInput[row][col] = char;
+  setUserInput(newInput);
 
-    await saveGameStateToServer(newInput, newCellStatus, score + scoreToAdd, mistakes + (isCorrect ? 0 : 1));
+  const isCorrect = char === dailyPuzzle.solution[row][col];
+  const newCellStatus = [...cellStatus];
 
-    if (scoreToAdd !== 0) {
-      await updateUserScoreInDB(currentUser.id, scoreToAdd, newInstantScore);
-    }
+  let scoreToAdd = 0;
+  let newInstantScore = instantScore;
 
-    if (!isCorrect) {
-      moveToNextCell(row, col);
-    } else {
-      findNextUnlockedCell();
-    }
-  };
+  if (isCorrect) {
+    newCellStatus[row][col] = 'locked';
+    scoreToAdd = 3;
+    newInstantScore = instantScore + scoreToAdd;
+  } else {
+    newCellStatus[row][col] = 'wrong';
+    scoreToAdd = -3;
+    newInstantScore = instantScore + scoreToAdd;
+    setMistakes(mistakes + 1);
+  }
+
+  setScore(score + scoreToAdd);
+  setInstantScore(newInstantScore);
+  setCellStatus(newCellStatus);
+
+  await saveGameStateToServer(newInput, newCellStatus, score + scoreToAdd, mistakes + (isCorrect ? 0 : 1));
+
+  if (scoreToAdd !== 0) {
+    await updateUserScoreInDB(currentUser.id, scoreToAdd, newInstantScore);
+  }
+
+  if (!isCorrect) {
+    moveToNextCell(row, col);
+  } else {
+    findNextUnlockedCell();
+  }
+};
 
   const findNextUnlockedCell = () => {
     if (!dailyPuzzle) return;
@@ -1051,15 +1103,15 @@ export default function HomePage() {
             </div>
             
             <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-              <h3>🎮 اطلاعات بازی</h3>
-              <p><strong>امتیاز کل:</strong> {currentUser.total_crossword_score || 0}</p>
-              <p><strong>امتیاز امروز:</strong> {currentUser.today_crossword_score || 0}</p>
-              <p><strong>امتیاز لحظه‌ای:</strong> {instantScore}</p>
-              <p><strong>تعداد بازی‌ها:</strong> {currentUser.crossword_games_played || 0}</p>
-              <p><strong>بازی‌های کامل:</strong> {currentUser.completed_crossword_games || 0}</p>
-              <p><strong>بازی‌های ناتمام:</strong> {currentUser.incomplete_crossword_games || 0}</p>
-              <p><strong>رتبه:</strong> {currentUser.crossword_rank || 'جدید'}</p>
-            </div>
+  <h3>🎮 اطلاعات بازی</h3>
+  <p><strong>امتیاز کل:</strong> {currentUser.total_crossword_score || 0}</p>
+  <p><strong>امتیاز امروز:</strong> {currentUser.today_crossword_score || 0}</p>
+  <p><strong>امتیاز لحظه‌ای:</strong> {instantScore}</p>
+  <p><strong>تعداد بازی‌ها:</strong> {currentUser.crossword_games_played || 0}</p>
+  <p><strong>بازی‌های کامل:</strong> {currentUser.completed_crossword_games || 0}</p>
+  <p><strong>بازی‌های ناتمام:</strong> {currentUser.incomplete_crossword_games || 0}</p>
+  <p><strong>رتبه:</strong> {currentUser.crossword_rank || 'جدید'}</p>
+</div>
 
             <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
               <h3>⏰ زمان‌بندی</h3>
