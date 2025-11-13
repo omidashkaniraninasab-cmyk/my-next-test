@@ -801,13 +801,14 @@ useEffect(() => {
         
         if (freshUserData) {
           // حالا تاریخچه رو با امتیاز امروز ذخیره کن
-          await saveGameToHistory(
-            currentUser.id, 
-            currentGameId, 
-            dailyPuzzle, 
-            mistakes,
-            freshUserData.today_crossword_score // 🎯 امتیاز امروز
-          );
+         const finalTodayScore = instantScore + 50;
+await saveGameToHistory(
+  currentUser.id, 
+  currentGameId, 
+  dailyPuzzle, 
+  mistakes,
+  finalTodayScore // 🎯 امتیاز نهایی امروز
+);
           console.log('✅ Game history saved with TODAY score:', freshUserData.today_crossword_score);
         }
       }
@@ -1379,9 +1380,9 @@ const getMotivationalMessage = (accuracy) => {
             
             <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
   <h3>🎮 اطلاعات بازی</h3>
-  <p><strong>امتیاز کل:</strong> {currentUser.total_crossword_score || 0}</p>
-  <p><strong>امتیاز امروز:</strong> {currentUser.today_crossword_score || 0}</p>
-  <p><strong>امتیاز لحظه‌ای:</strong> {instantScore}</p>
+ <p><strong>امتیاز کل:</strong> {currentUser.total_crossword_score || 0}</p>
+<p><strong>امتیاز امروز:</strong> {instantScore}</p> {/* 🆕 از instantScore استفاده کن */}
+<p><strong>امتیاز لحظه‌ای:</strong> {instantScore}</p>
   <p><strong>تعداد بازی‌ها:</strong> {currentUser.crossword_games_played || 0}</p>
   <p><strong>بازی‌های کامل:</strong> {currentUser.completed_crossword_games || 0}</p>
   <p><strong>بازی‌های ناتمام:</strong> {currentUser.incomplete_crossword_games || 0}</p>
