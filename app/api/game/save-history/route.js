@@ -5,24 +5,16 @@ const sql = neon(process.env.DATABASE_URL);
 
 export async function POST(request) {
   try {
-    const { userId, gameId, puzzleData, mistakes } = await request.json();
+    const { userId, gameId, puzzleData, mistakes, todayScore } = await request.json(); // 🆕 todayScore رو دریافت کن
     
     if (!userId || !gameId) {
       return Response.json({ error: 'User ID and Game ID required' }, { status: 400 });
     }
 
-    // 🎯 امتیاز رو از today_crossword_score کاربر بگیر
-    const user = await sql`
-      SELECT today_crossword_score 
-      FROM user_profiles 
-      WHERE id = ${userId}
-    `;
+    console.log('💾 Saving game history with todayScore:', todayScore);
 
-    if (user.length === 0) {
-      return Response.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    const score = user[0].today_crossword_score;
+    // 🆕 از todayScore استفاده کن، نه از دیتابیس
+    const score = todayScore; 
     const completionTime = null;
 
     await saveGameToHistory(userId, gameId, puzzleData, score, mistakes, completionTime);
@@ -30,7 +22,7 @@ export async function POST(request) {
     return Response.json({ 
       success: true,
       message: 'بازی در تاریخچه ذخیره شد',
-      score: score // امتیاز ذخیره شده
+      score: score // امتیاز امروز
     });
     
   } catch (error) {
