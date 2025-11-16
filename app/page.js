@@ -171,7 +171,7 @@ useEffect(() => {
     const response = await fetch('/api/daily-puzzle');
     
     if (response.status === 423) {
-      // بازی قفله - auto-refresh بعد از ۱ دقیقه
+      // بازی قفله - auto-refresh هر 30 ثانیه
       const closedData = await response.json();
       setDailyPuzzle({
         closed: true,
@@ -180,18 +180,29 @@ useEffect(() => {
         nextOpenTime: closedData.nextOpenTime
       });
       
-      console.log('⏸️ Game is closed, will retry in 1 minute...');
+      console.log('⏸️ Game is closed, will retry in 30 seconds...');
       
-      // 🆕 auto-refresh بعد از ۱ دقیقه
-      setTimeout(() => {
+      // 🆕 auto-refresh هر 30 ثانیه تا بازی باز شود
+      const retryInterval = setInterval(() => {
         console.log('🔄 Auto-refreshing puzzle...');
-        loadDailyPuzzle();
-      }, 60000); // 1 دقیقه
+        loadDailyPuzzle().then(() => {
+          // اگر بازی باز شد، interval را پاک کن
+          if (!dailyPuzzle?.closed) {
+            clearInterval(retryInterval);
+          }
+        });
+      }, 30000); // 30 ثانیه
       
     } else if (response.ok) {
       // بازی بازه
       const puzzleData = await response.json();
       setDailyPuzzle(puzzleData);
+      
+      // 🆕 **اگر بازی باز است، وضعیت todayGameCompleted را چک کن**
+      if (currentUser && currentUser.id !== 'guest') {
+        await checkGameStatus(currentUser.id);
+      }
+      
       console.log('✅ Daily puzzle loaded');
     } else {
       throw new Error('Failed to load puzzle');
@@ -802,6 +813,13 @@ useEffect(() => {
         if (freshUserData) {
           // حالا تاریخچه رو با امتیاز امروز ذخیره کن
          const finalTodayScore = instantScore + 50;
+         console.log('🔍 Calling saveGameToHistory with:', {
+  userId: currentUser.id,
+  gameId: currentGameId,
+  todayScore: instantScore + 50,
+  instantScore,
+  bonus: 50
+});
 await saveGameToHistory(
   currentUser.id, 
   currentGameId, 
@@ -809,6 +827,7 @@ await saveGameToHistory(
   mistakes,
   finalTodayScore // 🎯 امتیاز نهایی امروز
 );
+console.log('✅ Save history function completed');
           console.log('✅ Game history saved with TODAY score:', freshUserData.today_crossword_score);
         }
       }
@@ -1395,11 +1414,14 @@ const getMotivationalMessage = (accuracy) => {
               <p><strong>خروج امروز:</strong> {currentUser.today_logout_time ? new Date(currentUser.today_logout_time).toLocaleString('fa-IR') : 'ثبت نشده'}</p>
             </div>
            
-            {currentUser && (
-              <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-                <GameHistory userId={currentUser.id} />
-              </div>
-            )}
+           {currentUser && (
+  <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+    <GameHistory 
+      userId={currentUser.id} 
+      key={currentUser.id + Date.now()} // 🆕 این خط رو اضافه کن
+    />
+  </div>
+)}
           </div>
         </div>
       )}
