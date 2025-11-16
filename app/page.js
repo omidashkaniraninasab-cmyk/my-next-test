@@ -69,6 +69,7 @@ export default function HomePage() {
   uniqueWrongCells: 0
 });
 const [mistakeHistory, setMistakeHistory] = useState({});
+const [currentTimeStatus, setCurrentTimeStatus] = useState('open'); // 'open', 'closed', 'just-opened'
 
 
   useEffect(() => {
@@ -176,7 +177,7 @@ useEffect(() => {
 
   
 
-  const loadDailyPuzzle = async () => {
+ const loadDailyPuzzle = async () => {
   try {
     setPuzzleLoading(true);
     console.log('🎯 Loading daily puzzle...');
@@ -192,39 +193,44 @@ useEffect(() => {
         description: closedData.description,
         nextOpenTime: closedData.nextOpenTime
       });
+      setCurrentTimeStatus('closed'); // 🆕 وضعیت زمان را تنظیم کن
       
-      console.log('⏸️ Game is closed, will retry in 30 seconds...');
+      console.log('⏸️ Game is closed (8-9 PM), will retry in 30 seconds...');
       
-      // 🆕 auto-refresh هر 30 ثانیه تا بازی باز شود
+      // auto-refresh هر 30 ثانیه تا بازی باز شود
       const retryInterval = setInterval(() => {
         console.log('🔄 Auto-refreshing puzzle...');
         loadDailyPuzzle().then(() => {
-          // اگر بازی باز شد، interval را پاک کن
           if (!dailyPuzzle?.closed) {
             clearInterval(retryInterval);
           }
         });
-      }, 30000); // 30 ثانیه
+      }, 30000);
       
     } else if (response.ok) {
       // بازی بازه
       const puzzleData = await response.json();
       setDailyPuzzle(puzzleData);
       
-      console.log('✅ Daily puzzle loaded');
+      // 🆕 **تعیین وضعیت زمان**
+      const now = new Date();
+      const tehranOffset = 3.5 * 60 * 60 * 1000;
+      const tehranTime = new Date(now.getTime() + tehranOffset);
+      const currentHour = tehranTime.getHours();
+      const currentMinute = tehranTime.getMinutes();
       
-      // 🆕 **اگر ریست روزانه انجام شده، وضعیت کاربر را refresh کن**
-      if (puzzleData.dailyReset && puzzleData.dailyReset.resetPerformed) {
-        console.log('🔄 Daily reset detected, refreshing user status...');
-        if (currentUser && currentUser.id !== 'guest') {
-          await checkGameStatus(currentUser.id);
-          await fetchUserStats(currentUser.id); // وضعیت کاربر رو refresh کن
-        }
+      if (currentHour === 21 && currentMinute <= 10) {
+        setCurrentTimeStatus('just-opened'); // تازه باز شده
+      } else {
+        setCurrentTimeStatus('open'); // عادی باز است
       }
       
-      // 🆕 **همیشه وضعیت بازی رو چک کن**
+      console.log('✅ Daily puzzle loaded, time status:', currentTimeStatus);
+      
+      // وضعیت کاربر را refresh کن
       if (currentUser && currentUser.id !== 'guest') {
         await checkGameStatus(currentUser.id);
+        await fetchUserStats(currentUser.id);
       }
       
     } else {
@@ -235,6 +241,7 @@ useEffect(() => {
     console.error('💥 Error loading daily puzzle:', error);
     const puzzleModule = await import('@/lib/dailyPuzzleData');
     setDailyPuzzle(puzzleModule.dailyPuzzleData);
+    setCurrentTimeStatus('open'); // fallback
   } finally {
     setPuzzleLoading(false);
   }
@@ -1032,7 +1039,7 @@ const getMotivationalMessage = (accuracy) => {
     ['ظ', 'ط', 'ز', 'ر', 'ذ', 'د', 'پ', 'و', 'ئ']
   ];
 
-  return (
+   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* هدر زیبا با منوی کاربر */}
       <header style={{
@@ -1652,11 +1659,36 @@ const getMotivationalMessage = (accuracy) => {
           }}>
             <h3>⏸️ بازی موقتاً تعطیل است</h3>
             <p>در حال به‌روزرسانی جدول جدید... ساعت ۹ شب بر می گردیم! 🎯</p>
+            <p style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
+              ⏰ بازی بعدی: ساعت {dailyPuzzle.nextOpenTime}
+            </p>
           </div>
         )}
 
-        {/* بازی فعال - فقط وقتی کاربر لاگین کرده، بازی باز است و هنوز بازی نکرده */}
-        {!dailyPuzzle?.closed && currentUser && !todayGameCompleted && !gameCompleted && (
+        {/* اگر کاربر بازی امروز را کامل کرده */}
+        {!dailyPuzzle?.closed && currentUser && todayGameCompleted && (
+          <div style={{ 
+            padding: '40px', 
+            textAlign: 'center', 
+            backgroundColor: '#e8f5e8', 
+            borderRadius: '10px',
+            marginBottom: '20px'
+          }}>
+            <h3>✅ بازی امروز تکمیل شد!</h3>
+            <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '10px 0' }}>
+              🎯 امتیاز شما امروز: <strong>{currentUser.today_crossword_score}</strong>
+            </p>
+            <p style={{ margin: '10px 0', color: '#666' }}>
+              ⏰ ساعت ۹ شب با جدول جدید بر می گردیم! 🎯
+            </p>
+          </div>
+        )}
+
+        {/* بازی فعال - فقط وقتی همه شرایط زیر برقرار باشد */}
+        {!dailyPuzzle?.closed && 
+         currentUser && 
+         !todayGameCompleted && 
+         !gameCompleted && (
           <div style={{ marginBottom: '40px' }}>
             {/* محتوای جدول و صفحه کلید */}
             <div style={{ 
@@ -1754,58 +1786,9 @@ const getMotivationalMessage = (accuracy) => {
             )}
           </div>
         )}
-
-        {/* پیام برای وقتی که بازی جدید آماده است اما وضعیت به روز نیست */}
-        {!dailyPuzzle?.closed && currentUser && todayGameCompleted && (
-          <div style={{ 
-            padding: '30px', 
-            textAlign: 'center', 
-            backgroundColor: '#e8f5e8', 
-            borderRadius: '10px',
-            marginBottom: '20px',
-            border: '2px solid #4CAF50'
-          }}>
-            <h3>🔄 بازی جدید آماده است!</h3>
-            <p style={{ margin: '15px 0', fontSize: '16px' }}>جدول روزانه جدید بارگذاری شد. برای شروع بازی جدید صفحه را رفرش کنید.</p>
-            <button 
-              onClick={() => window.location.reload()}
-              style={{
-                padding: '12px 24px',
-                backgroundColor: '#4CAF50',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: 'bold'
-              }}
-            >
-              🔄 رفرش صفحه برای بازی جدید
-            </button>
-          </div>
-        )}
-
-        {/* پیام بعد از اتمام بازی */}
-        {gameCompleted && currentUser && (
-          <div style={{ 
-            padding: '40px', 
-            textAlign: 'center', 
-            backgroundColor: '#e8f5e8', 
-            borderRadius: '10px',
-            marginBottom: '20px'
-          }}>
-            <h3>✅ بازی امروز تکمیل شد!</h3>
-            <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '10px 0' }}>
-              🎯 امتیاز شما امروز: <strong>{currentUser.today_crossword_score}</strong>
-            </p>
-            <p style={{ margin: '10px 0', color: '#666' }}>
-              ⏰ ساعت ۹ شب با جدول جدید بر می گردیم! 🎯
-            </p>
-          </div>
-        )}
       </div>
 
-      {/* لیست کاربران - مرتب شده بر اساس امتیاز کل */}
+      {/* لیست کاربران */}
       <div>
         <h2>رده‌بندی کاربران</h2>
         <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
