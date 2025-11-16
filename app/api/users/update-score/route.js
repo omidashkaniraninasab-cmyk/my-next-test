@@ -13,8 +13,8 @@ export async function POST(request) {
       return Response.json({ error: 'User ID required' }, { status: 400 });
     }
 
-    // بررسی و ریست امتیاز امروز اگر تاریخ تغییر کرده
-    await resetTodayScoreIfNeeded(userId);
+    // 🆕 **ریست امتیاز امروز فقط اگر تاریخ تغییر کرده و additionalScore صفر نیست**
+    await resetTodayScoreIfNeeded(userId, additionalScore);
 
     // آپدیت امتیاز کاربر - با instant_crossword_score
     await sql`
@@ -22,7 +22,7 @@ export async function POST(request) {
       SET 
         today_crossword_score = COALESCE(today_crossword_score, 0) + ${additionalScore},
         total_crossword_score = COALESCE(total_crossword_score, 0) + ${additionalScore},
-        instant_crossword_score = ${currentInstantScore}  -- این خط رو برگردوندیم
+        instant_crossword_score = ${currentInstantScore}
       WHERE id = ${userId}
     `;
 
@@ -39,8 +39,8 @@ export async function POST(request) {
   }
 }
 
-// تابع برای ریست امتیاز امروز اگر تاریخ تغییر کرده
-async function resetTodayScoreIfNeeded(userId) {
+// 🆕 **تابع اصلاح شده برای ریست امتیاز امروز**
+async function resetTodayScoreIfNeeded(userId, additionalScore) {
   try {
     const today = new Date();
     const todayDate = today.toISOString().split('T')[0];
@@ -57,7 +57,9 @@ async function resetTodayScoreIfNeeded(userId) {
     const lastResetDate = userData.last_score_reset_date ? 
       new Date(userData.last_score_reset_date).toISOString().split('T')[0] : null;
 
-    if (!lastResetDate || lastResetDate !== todayDate) {
+    // 🆕 **فقط اگر تاریخ تغییر کرده و additionalScore صفر است ریست کن**
+    // این یعنی کاربر هنوز بازی امروز را شروع نکرده
+    if ((!lastResetDate || lastResetDate !== todayDate) && additionalScore === 0) {
       console.log('🔄 Resetting today score for user:', userId);
       
       await sql`
@@ -65,6 +67,16 @@ async function resetTodayScoreIfNeeded(userId) {
         SET 
           today_crossword_score = 0,
           instant_crossword_score = 0,
+          last_score_reset_date = ${todayDate}
+        WHERE id = ${userId}
+      `;
+    } else if (!lastResetDate || lastResetDate !== todayDate) {
+      // 🆕 **اگر تاریخ تغییر کرده اما additionalScore صفر نیست، فقط تاریخ رو آپدیت کن**
+      console.log('📅 Updating reset date for user:', userId);
+      
+      await sql`
+        UPDATE user_profiles 
+        SET 
           last_score_reset_date = ${todayDate}
         WHERE id = ${userId}
       `;

@@ -342,68 +342,69 @@ useEffect(() => {
     }
   };
 
-  const startNewGame = async (userId) => {
-    try {
-      console.log('🎮 startNewGame called with userId:', userId);
+ const startNewGame = async (userId) => {
+  try {
+    console.log('🎮 startNewGame called with userId:', userId);
+    
+    const response = await fetch('/api/game', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'start',
+        userId: userId,
+        gameData: { puzzle: dailyPuzzle }
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Game started successfully:', data);
       
-      const response = await fetch('/api/game', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'start',
-          userId: userId,
-          gameData: { puzzle: dailyPuzzle }
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Game started successfully:', data);
-        
-        setCurrentGameId(data.game.id);
-        setScore(0);
-        setMistakes(0);
-        setInstantScore(0);
-        
-        await updateUserScoreInDB(userId, 0, 0);
-        
-        const size = dailyPuzzle ? dailyPuzzle.size : 6;
-        setUserInput(Array(size).fill().map(() => Array(size).fill('')));
-        setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
-        setSelectedCell([0, 0]);
-        setGameCompleted(false);
-        
-        console.log('✅ Game state reset completed');
-      }
-    } catch (error) {
-      console.error('❌ Error starting game:', error);
+      setCurrentGameId(data.game.id);
+      setScore(0);
+      setMistakes(0);
+      setInstantScore(0);
+      
+      // 🆕 **ارسال additionalScore = 0 برای ریست امتیاز امروز در صورت نیاز**
+      await updateUserScoreInDB(userId, 0, 0);
+      
+      const size = dailyPuzzle ? dailyPuzzle.size : 6;
+      setUserInput(Array(size).fill().map(() => Array(size).fill('')));
+      setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
+      setSelectedCell([0, 0]);
+      setGameCompleted(false);
+      
+      console.log('✅ Game state reset completed');
     }
-  };
+  } catch (error) {
+    console.error('❌ Error starting game:', error);
+  }
+};
 
-  const updateUserScoreInDB = async (userId, additionalScore, currentInstantScore) => {
-    try {
-      const response = await fetch('/api/users/update-score', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: userId,
-          additionalScore: additionalScore,
-          currentInstantScore: currentInstantScore
-        }),
-      });
+ const updateUserScoreInDB = async (userId, additionalScore, currentInstantScore) => {
+  try {
+    const response = await fetch('/api/users/update-score', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: userId,
+        additionalScore: additionalScore,
+        currentInstantScore: currentInstantScore
+      }),
+    });
 
-      if (response.ok) {
-        await fetchUserStats(userId);
-        await fetchUsers();
-      }
-    } catch (error) {
-      console.error('Error updating score:', error);
+    if (response.ok) {
+      await fetchUserStats(userId);
+      await fetchUsers();
     }
-  };
+  } catch (error) {
+    console.error('Error updating score:', error);
+  }
+};
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -725,7 +726,7 @@ useEffect(() => {
     checkGameCompletion();
   };
 
-  const checkGameCompletion = async () => {
+ const checkGameCompletion = async () => {
   if (!dailyPuzzle) return;
   
   let allLocked = true;
@@ -743,11 +744,13 @@ useEffect(() => {
   if (allLocked && !gameCompleted) {
     const bonusScore = 50;
     const finalScore = score + bonusScore;
+    const finalInstantScore = instantScore + bonusScore; // 🆕 امتیاز لحظه‌ای نهایی
     
     setScore(finalScore);
     setGameCompleted(true);
     setTodayGameCompleted(true);
-    setInstantScore(0);
+    // 🆕 instantScore رو صفر نکن - فقط برای نمایش استفاده میشه
+    // setInstantScore(0);
     
     try {
       await fetch('/api/users/update-score', {
@@ -758,7 +761,7 @@ useEffect(() => {
         body: JSON.stringify({
           userId: currentUser.id,
           additionalScore: bonusScore,
-          currentInstantScore: 0
+          currentInstantScore: finalInstantScore // 🆕 از امتیاز نهایی استفاده کن
         }),
       });
       console.log('✅ Bonus score added');
@@ -832,7 +835,7 @@ useEffect(() => {
       }
     }
 
-    // 🆕 **ذخیره تاریخچه با امتیاز امروز - بخش جدید و مهم**
+    // 🆕 **ذخیره تاریخچه با امتیاز واقعی**
     try {
       // اول اطلاعات تازه کاربر رو از سرور بگیر
       const userResponse = await fetch('/api/users');
@@ -841,24 +844,25 @@ useEffect(() => {
         const freshUserData = usersData.find(user => user.id === currentUser.id);
         
         if (freshUserData) {
-          // حالا تاریخچه رو با امتیاز امروز ذخیره کن
-         const finalTodayScore = instantScore + 50;
-         console.log('🔍 Calling saveGameToHistory with:', {
-  userId: currentUser.id,
-  gameId: currentGameId,
-  todayScore: instantScore + 50,
-  instantScore,
-  bonus: 50
-});
-await saveGameToHistory(
-  currentUser.id, 
-  currentGameId, 
-  dailyPuzzle, 
-  mistakes,
-  finalTodayScore // 🎯 امتیاز نهایی امروز
-);
-console.log('✅ Save history function completed');
-          console.log('✅ Game history saved with TODAY score:', freshUserData.today_crossword_score);
+          // 🆕 از امتیاز واقعی امروز استفاده کن، نه instantScore
+          const finalTodayScore = freshUserData.today_crossword_score;
+          console.log('🔍 Calling saveGameToHistory with:', {
+            userId: currentUser.id,
+            gameId: currentGameId,
+            todayScore: finalTodayScore,
+            instantScore: finalInstantScore,
+            bonus: bonusScore
+          });
+          
+          await saveGameToHistory(
+            currentUser.id, 
+            currentGameId, 
+            dailyPuzzle, 
+            mistakes,
+            finalTodayScore // 🎯 استفاده از امتیاز واقعی امروز از دیتابیس
+          );
+          console.log('✅ Save history function completed');
+          console.log('✅ Game history saved with TODAY score:', finalTodayScore);
         }
       }
     } catch (error) {
@@ -1428,15 +1432,15 @@ const getMotivationalMessage = (accuracy) => {
             </div>
             
             <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-              <h3>🎮 اطلاعات بازی</h3>
-              <p><strong>امتیاز کل:</strong> {currentUser.total_crossword_score || 0}</p>
-              <p><strong>امتیاز امروز:</strong> {instantScore}</p>
-              <p><strong>امتیاز لحظه‌ای:</strong> {instantScore}</p>
-              <p><strong>تعداد بازی‌ها:</strong> {currentUser.crossword_games_played || 0}</p>
-              <p><strong>بازی‌های کامل:</strong> {currentUser.completed_crossword_games || 0}</p>
-              <p><strong>بازی‌های ناتمام:</strong> {currentUser.incomplete_crossword_games || 0}</p>
-              <p><strong>رتبه:</strong> {currentUser.crossword_rank || 'جدید'}</p>
-            </div>
+  <h3>🎮 اطلاعات بازی</h3>
+  <p><strong>امتیاز کل:</strong> {currentUser.total_crossword_score || 0}</p>
+  <p><strong>امتیاز امروز:</strong> {currentUser.today_crossword_score || 0}</p> {/* 🆕 از دیتابیس استفاده کن */}
+  <p><strong>امتیاز لحظه‌ای:</strong> {instantScore}</p>
+  <p><strong>تعداد بازی‌ها:</strong> {currentUser.crossword_games_played || 0}</p>
+  <p><strong>بازی‌های کامل:</strong> {currentUser.completed_crossword_games || 0}</p>
+  <p><strong>بازی‌های ناتمام:</strong> {currentUser.incomplete_crossword_games || 0}</p>
+  <p><strong>رتبه:</strong> {currentUser.crossword_rank || 'جدید'}</p>
+</div>
 
             <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
               <h3>⏰ زمان‌بندی</h3>
