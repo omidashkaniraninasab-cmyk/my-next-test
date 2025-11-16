@@ -773,37 +773,37 @@ const checkGameCompletion = async () => {
 
       // 3. صبر کن و سپس تاریخچه رو ذخیره کن
       console.log('⏳ Step 3: Waiting for database to update...');
-      setTimeout(async () => {
-        try {
-          // اطلاعات تازه کاربر رو از سرور بگیر
-          console.log('📥 Step 3a: Fetching fresh user data...');
-          const userResponse = await fetch('/api/users');
-          if (userResponse.ok) {
-            const usersData = await userResponse.json();
-            const freshUserData = usersData.find(user => user.id === currentUser.id);
-            
-            if (freshUserData) {
-              const finalTodayScore = freshUserData.today_crossword_score;
-              console.log('🎯 Step 3b: Saving game history with score:', finalTodayScore);
-              
-              await saveGameToHistory(
-                currentUser.id, 
-                currentGameId, 
-                dailyPuzzle, 
-                mistakes,
-                finalTodayScore
-              );
-              console.log('✅ Step 3: Game history saved successfully');
-            } else {
-              console.error('❌ User not found in fresh data');
-            }
-          } else {
-            console.error('❌ Failed to fetch fresh user data');
-          }
-        } catch (error) {
-          console.error('❌ Error in step 3:', error);
+      // در تابع checkGameCompletion - این بخش را اصلاح کنید
+setTimeout(async () => {
+  try {
+    // اطلاعات تازه کاربر رو از سرور بگیر
+    const userResponse = await fetch('/api/users');
+    if (userResponse.ok) {
+      const usersData = await userResponse.json();
+      const freshUserData = usersData.find(user => user.id === currentUser.id);
+      
+      if (freshUserData) {
+        const finalTodayScore = freshUserData.today_crossword_score;
+        console.log('🎯 Saving game history with TODAY score:', finalTodayScore);
+        
+        // 🆕 اگر امتیاز صفر است، صبر بیشتری کن
+        if (finalTodayScore === 0) {
+          console.log('⏳ Score is still 0, waiting more...');
+          setTimeout(async () => {
+            const userResponse2 = await fetch('/api/users');
+            const usersData2 = await userResponse2.json();
+            const freshUserData2 = usersData2.find(user => user.id === currentUser.id);
+            await saveGameToHistory(currentUser.id, currentGameId, dailyPuzzle, mistakes, freshUserData2.today_crossword_score);
+          }, 1000);
+        } else {
+          await saveGameToHistory(currentUser.id, currentGameId, dailyPuzzle, mistakes, finalTodayScore);
         }
-      }, 1500); // 1.5 ثانیه تاخیر برای اطمینان
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error saving game history:', error);
+  }
+}, 2000); // 🆕 تاخیر را به 2 ثانیه افزایش دهید
 
       // 4. XP اضافه کن
       console.log('📤 Step 4: Adding XP for game completion...');

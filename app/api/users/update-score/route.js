@@ -1,3 +1,4 @@
+// app/api/users/update-score/route.js - نسخه اصلاح شده
 import { neon } from '@neondatabase/serverless';
 import { updateUserRanks } from '@/lib/db';
 
@@ -7,7 +8,7 @@ export async function POST(request) {
   try {
     const { userId, additionalScore, currentInstantScore } = await request.json();
     
-    console.log('📊 Updating score for user:', userId, 'Additional score:', additionalScore, 'Current instant:', currentInstantScore);
+    console.log('📊 Updating score for user:', userId, 'Additional:', additionalScore, 'Instant:', currentInstantScore);
     
     if (!userId) {
       return Response.json({ error: 'User ID required' }, { status: 400 });
@@ -18,7 +19,7 @@ export async function POST(request) {
       await resetTodayScoreIfNeeded(userId);
     }
 
-    // 🆕 **همیشه today_crossword_score را آپدیت کن**
+    // 🆕 **فقط today_crossword_score را آپدیت کن**
     await sql`
       UPDATE user_profiles 
       SET 
@@ -27,8 +28,10 @@ export async function POST(request) {
       WHERE id = ${userId}
     `;
 
-    // 🆕 **همیشه total_crossword_score را هم آپدیت کن (اما فقط برای امتیازهای مثبت)**
+    // 🆕 **total_crossword_score را فقط برای امتیازهای مثبت آپدیت کن**
+    // و فقط اگر additionalScore > 0 باشد (یعنی کاربر امتیاز کسب کرده)
     if (additionalScore > 0) {
+      console.log('💰 Adding to total score:', additionalScore);
       await sql`
         UPDATE user_profiles 
         SET 
