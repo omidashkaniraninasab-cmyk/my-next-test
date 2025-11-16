@@ -177,7 +177,7 @@ useEffect(() => {
 
   
 
- const loadDailyPuzzle = async () => {
+const loadDailyPuzzle = async () => {
   try {
     setPuzzleLoading(true);
     console.log('🎯 Loading daily puzzle...');
@@ -185,7 +185,7 @@ useEffect(() => {
     const response = await fetch('/api/daily-puzzle');
     
     if (response.status === 423) {
-      // بازی قفله - auto-refresh هر 30 ثانیه
+      // بازی قفله
       const closedData = await response.json();
       setDailyPuzzle({
         closed: true,
@@ -193,41 +193,14 @@ useEffect(() => {
         description: closedData.description,
         nextOpenTime: closedData.nextOpenTime
       });
-      setCurrentTimeStatus('closed'); // 🆕 وضعیت زمان را تنظیم کن
-      
-      console.log('⏸️ Game is closed (8-9 PM), will retry in 30 seconds...');
-      
-      // auto-refresh هر 30 ثانیه تا بازی باز شود
-      const retryInterval = setInterval(() => {
-        console.log('🔄 Auto-refreshing puzzle...');
-        loadDailyPuzzle().then(() => {
-          if (!dailyPuzzle?.closed) {
-            clearInterval(retryInterval);
-          }
-        });
-      }, 30000);
-      
     } else if (response.ok) {
       // بازی بازه
       const puzzleData = await response.json();
       setDailyPuzzle(puzzleData);
       
-      // 🆕 **تعیین وضعیت زمان**
-      const now = new Date();
-      const tehranOffset = 3.5 * 60 * 60 * 1000;
-      const tehranTime = new Date(now.getTime() + tehranOffset);
-      const currentHour = tehranTime.getHours();
-      const currentMinute = tehranTime.getMinutes();
+      console.log('✅ Daily puzzle loaded');
       
-      if (currentHour === 21 && currentMinute <= 10) {
-        setCurrentTimeStatus('just-opened'); // تازه باز شده
-      } else {
-        setCurrentTimeStatus('open'); // عادی باز است
-      }
-      
-      console.log('✅ Daily puzzle loaded, time status:', currentTimeStatus);
-      
-      // وضعیت کاربر را refresh کن
+      // 🆕 **همیشه وضعیت کاربر را بعد از بارگذاری بازی refresh کن**
       if (currentUser && currentUser.id !== 'guest') {
         await checkGameStatus(currentUser.id);
         await fetchUserStats(currentUser.id);
@@ -241,7 +214,6 @@ useEffect(() => {
     console.error('💥 Error loading daily puzzle:', error);
     const puzzleModule = await import('@/lib/dailyPuzzleData');
     setDailyPuzzle(puzzleModule.dailyPuzzleData);
-    setCurrentTimeStatus('open'); // fallback
   } finally {
     setPuzzleLoading(false);
   }

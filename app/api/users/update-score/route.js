@@ -13,10 +13,12 @@ export async function POST(request) {
       return Response.json({ error: 'User ID required' }, { status: 400 });
     }
 
-    // 🆕 **ریست امتیاز امروز فقط اگر تاریخ تغییر کرده و additionalScore صفر نیست**
-    await resetTodayScoreIfNeeded(userId, additionalScore);
+    // 🆕 فقط اگر additionalScore صفر است (شروع بازی جدید) ریست کن
+    if (additionalScore === 0) {
+      await resetTodayScoreIfNeeded(userId);
+    }
 
-    // آپدیت امتیاز کاربر - با instant_crossword_score
+    // آپدیت امتیاز کاربر
     await sql`
       UPDATE user_profiles 
       SET 
@@ -39,8 +41,8 @@ export async function POST(request) {
   }
 }
 
-// 🆕 **تابع اصلاح شده برای ریست امتیاز امروز**
-async function resetTodayScoreIfNeeded(userId, additionalScore) {
+// 🆕 تابع ساده‌تر برای ریست
+async function resetTodayScoreIfNeeded(userId) {
   try {
     const today = new Date();
     const todayDate = today.toISOString().split('T')[0];
@@ -57,26 +59,16 @@ async function resetTodayScoreIfNeeded(userId, additionalScore) {
     const lastResetDate = userData.last_score_reset_date ? 
       new Date(userData.last_score_reset_date).toISOString().split('T')[0] : null;
 
-    // 🆕 **فقط اگر تاریخ تغییر کرده و additionalScore صفر است ریست کن**
-    // این یعنی کاربر هنوز بازی امروز را شروع نکرده
-    if ((!lastResetDate || lastResetDate !== todayDate) && additionalScore === 0) {
-      console.log('🔄 Resetting today score for user:', userId);
+    // فقط اگر تاریخ تغییر کرده باشد ریست کن
+    if (!lastResetDate || lastResetDate !== todayDate) {
+      console.log('🔄 Resetting today score for new day:', userId);
       
       await sql`
         UPDATE user_profiles 
         SET 
           today_crossword_score = 0,
           instant_crossword_score = 0,
-          last_score_reset_date = ${todayDate}
-        WHERE id = ${userId}
-      `;
-    } else if (!lastResetDate || lastResetDate !== todayDate) {
-      // 🆕 **اگر تاریخ تغییر کرده اما additionalScore صفر نیست، فقط تاریخ رو آپدیت کن**
-      console.log('📅 Updating reset date for user:', userId);
-      
-      await sql`
-        UPDATE user_profiles 
-        SET 
+          today_game_completed = FALSE,  -- 🆕 این خط حیاتی
           last_score_reset_date = ${todayDate}
         WHERE id = ${userId}
       `;
