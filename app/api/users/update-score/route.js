@@ -7,7 +7,7 @@ export async function POST(request) {
   try {
     const { userId, additionalScore, currentInstantScore } = await request.json();
     
-    console.log('Updating score for user:', userId, 'Additional score:', additionalScore, 'Current instant:', currentInstantScore);
+    console.log('📊 Updating score for user:', userId, 'Additional score:', additionalScore, 'Current instant:', currentInstantScore);
     
     if (!userId) {
       return Response.json({ error: 'User ID required' }, { status: 400 });
@@ -18,7 +18,7 @@ export async function POST(request) {
       await resetTodayScoreIfNeeded(userId);
     }
 
-    // 🆕 **فقط today_crossword_score را آپدیت کن، total_crossword_score را نه**
+    // 🆕 **همیشه today_crossword_score را آپدیت کن**
     await sql`
       UPDATE user_profiles 
       SET 
@@ -27,8 +27,8 @@ export async function POST(request) {
       WHERE id = ${userId}
     `;
 
-    // 🆕 **امتیاز کل را فقط وقتی بازی کامل شد آپدیت کن**
-    if (additionalScore === 50) { // اگر bonus score است
+    // 🆕 **همیشه total_crossword_score را هم آپدیت کن (اما فقط برای امتیازهای مثبت)**
+    if (additionalScore > 0) {
       await sql`
         UPDATE user_profiles 
         SET 

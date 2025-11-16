@@ -717,14 +717,25 @@ const checkGameCompletion = async () => {
 
   if (allLocked && !gameCompleted) {
     const bonusScore = 50;
+    const finalInstantScore = instantScore + bonusScore;
     const finalScore = score + bonusScore;
     
+    console.log('🎯 Game completed!', {
+      instantScore,
+      bonusScore,
+      finalInstantScore,
+      score,
+      finalScore
+    });
+
     setScore(finalScore);
     setGameCompleted(true);
     setTodayGameCompleted(true);
     
     try {
-      await fetch('/api/users/update-score', {
+      // 1. اول امتیاز رو آپدیت کن
+      console.log('📤 Step 1: Updating user score in database...');
+      const updateResponse = await fetch('/api/users/update-score', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -732,54 +743,137 @@ const checkGameCompletion = async () => {
         body: JSON.stringify({
           userId: currentUser.id,
           additionalScore: bonusScore,
-          currentInstantScore: instantScore + bonusScore
+          currentInstantScore: finalInstantScore
         }),
       });
-      console.log('✅ Bonus score added');
-    } catch (error) {
-      console.error('❌ Error adding bonus:', error);
-    }
 
-    // 🆕 **ذخیره تاریخچه با امتیاز واقعی**
-    try {
-      // صبر کن تا امتیاز در دیتابیس ذخیره شود
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // اطلاعات تازه کاربر رو از سرور بگیر
-      const userResponse = await fetch('/api/users');
-      if (userResponse.ok) {
-        const usersData = await userResponse.json();
-        const freshUserData = usersData.find(user => user.id === currentUser.id);
-        
-        if (freshUserData) {
-          // 🆕 از امتیاز واقعی امروز استفاده کن
-          const finalTodayScore = freshUserData.today_crossword_score;
-          console.log('🔍 Saving game history with score:', finalTodayScore);
-          
-          await saveGameToHistory(
-            currentUser.id, 
-            currentGameId, 
-            dailyPuzzle, 
-            mistakes,
-            finalTodayScore // 🎯 استفاده از امتیاز واقعی
-          );
-          console.log('✅ Game history saved with score:', finalTodayScore);
+      if (!updateResponse.ok) {
+        throw new Error('Failed to update score');
+      }
+      console.log('✅ Step 1: Score updated in database');
+
+      // 2. بازی رو کامل شده علامت بزن
+      console.log('📤 Step 2: Marking game as completed...');
+      const completeResponse = await fetch('/api/game/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          gameId: currentGameId,
+          finalScore: finalScore,
+          userId: currentUser.id
+        }),
+      });
+
+      if (!completeResponse.ok) {
+        throw new Error('Failed to complete game');
+      }
+      console.log('✅ Step 2: Game marked as completed');
+
+      // 3. صبر کن و سپس تاریخچه رو ذخیره کن
+      console.log('⏳ Step 3: Waiting for database to update...');
+      setTimeout(async () => {
+        try {
+          // اطلاعات تازه کاربر رو از سرور بگیر
+          console.log('📥 Step 3a: Fetching fresh user data...');
+          const userResponse = await fetch('/api/users');
+          if (userResponse.ok) {
+            const usersData = await userResponse.json();
+            const freshUserData = usersData.find(user => user.id === currentUser.id);
+            
+            if (freshUserData) {
+              const finalTodayScore = freshUserData.today_crossword_score;
+              console.log('🎯 Step 3b: Saving game history with score:', finalTodayScore);
+              
+              await saveGameToHistory(
+                currentUser.id, 
+                currentGameId, 
+                dailyPuzzle, 
+                mistakes,
+                finalTodayScore
+              );
+              console.log('✅ Step 3: Game history saved successfully');
+            } else {
+              console.error('❌ User not found in fresh data');
+            }
+          } else {
+            console.error('❌ Failed to fetch fresh user data');
+          }
+        } catch (error) {
+          console.error('❌ Error in step 3:', error);
+        }
+      }, 1500); // 1.5 ثانیه تاخیر برای اطمینان
+
+      // 4. XP اضافه کن
+      console.log('📤 Step 4: Adding XP for game completion...');
+      try {
+        await fetch('/api/user/level', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            xp: 100,
+            reason: 'اتمام بازی کراسورد'
+          })
+        });
+        console.log('✅ Step 4: XP added for game completion');
+      } catch (error) {
+        console.error('❌ Error adding XP:', error);
+      }
+
+      // 5. پاداش دقت بالا
+      console.log('📊 Step 5: Calculating accuracy bonus...');
+      const currentPerformance = calculateDailyPerformance();
+      let accuracyBonus = 0;
+      let accuracyReason = '';
+
+      if (currentPerformance.accuracy >= 90) {
+        accuracyBonus = 100;
+        accuracyReason = 'دقت استثنایی (۹۰٪+)';
+      } else if (currentPerformance.accuracy >= 80) {
+        accuracyBonus = 50;
+        accuracyReason = 'دقت عالی (۸۰٪+)';
+      } else if (currentPerformance.accuracy >= 70) {
+        accuracyBonus = 25;
+        accuracyReason = 'دقت خوب (۷۰٪+)';
+      }
+
+      if (accuracyBonus > 0) {
+        try {
+          await fetch('/api/user/level', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: currentUser.id,
+              xp: accuracyBonus,
+              reason: accuracyReason
+            })
+          });
+          console.log(`✅ Step 5: Accuracy bonus added: ${accuracyBonus} XP`);
+        } catch (error) {
+          console.error('❌ Error adding accuracy bonus:', error);
         }
       }
-    } catch (error) {
-      console.error('❌ Error saving game history:', error);
-    }
 
-    // بقیه کدها...
+      // 6. بروزرسانی وضعیت کاربر
+      console.log('🔄 Step 6: Refreshing user stats...');
+      await fetchUserLevel(currentUser.id);
+      await fetchUserStats(currentUser.id);
+      
+      console.log('🎉 All steps completed successfully!');
+
+    } catch (error) {
+      console.error('❌ Error in game completion process:', error);
+    }
   }
 };
 
-  const saveGameToHistory = async (userId, gameId, puzzleData, mistakes, todayScore) => {
+ const saveGameToHistory = async (userId, gameId, puzzleData, mistakes, todayScore) => {
   try {
-    // 🆕 تاخیر برای اطمینان از ذخیره شدن امتیاز
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('💾 Saving to history with score:', todayScore);
     
-    await fetch('/api/game/save-history', {
+    const response = await fetch('/api/game/save-history', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -788,14 +882,19 @@ const checkGameCompletion = async () => {
         userId: userId,
         gameId: gameId,
         puzzleData: puzzleData,
-        score: todayScore,
+        score: todayScore, // این باید امتیاز واقعی باشد
         mistakes: mistakes,
         date: new Date().toISOString()
       }),
     });
-    console.log('✅ Game saved to history with score:', todayScore);
+
+    if (response.ok) {
+      console.log('✅ Game saved to history with score:', todayScore);
+    } else {
+      console.error('❌ Failed to save history:', response.status);
+    }
   } catch (error) {
-    console.error('Error saving game history:', error);
+    console.error('❌ Error saving game history:', error);
   }
 };
 
