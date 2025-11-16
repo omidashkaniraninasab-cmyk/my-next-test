@@ -13,25 +13,34 @@ export async function POST(request) {
       return Response.json({ error: 'User ID required' }, { status: 400 });
     }
 
-    // 🆕 فقط اگر additionalScore صفر است (شروع بازی جدید) ریست کن
+    // فقط اگر additionalScore صفر است (شروع بازی جدید) ریست کن
     if (additionalScore === 0) {
       await resetTodayScoreIfNeeded(userId);
     }
 
-    // آپدیت امتیاز کاربر
+    // 🆕 **فقط today_crossword_score را آپدیت کن، total_crossword_score را نه**
     await sql`
       UPDATE user_profiles 
       SET 
         today_crossword_score = COALESCE(today_crossword_score, 0) + ${additionalScore},
-        total_crossword_score = COALESCE(total_crossword_score, 0) + ${additionalScore},
         instant_crossword_score = ${currentInstantScore}
       WHERE id = ${userId}
     `;
 
+    // 🆕 **امتیاز کل را فقط وقتی بازی کامل شد آپدیت کن**
+    if (additionalScore === 50) { // اگر bonus score است
+      await sql`
+        UPDATE user_profiles 
+        SET 
+          total_crossword_score = COALESCE(total_crossword_score, 0) + ${additionalScore}
+        WHERE id = ${userId}
+      `;
+    }
+
     // آپدیت رتبه همه کاربران
     await updateUserRanks();
 
-    console.log('✅ All scores updated successfully');
+    console.log('✅ Scores updated successfully');
 
     return Response.json({ success: true });
     
@@ -41,7 +50,7 @@ export async function POST(request) {
   }
 }
 
-// 🆕 تابع ساده‌تر برای ریست
+// تابع ریست بدون تغییر
 async function resetTodayScoreIfNeeded(userId) {
   try {
     const today = new Date();
@@ -59,7 +68,6 @@ async function resetTodayScoreIfNeeded(userId) {
     const lastResetDate = userData.last_score_reset_date ? 
       new Date(userData.last_score_reset_date).toISOString().split('T')[0] : null;
 
-    // فقط اگر تاریخ تغییر کرده باشد ریست کن
     if (!lastResetDate || lastResetDate !== todayDate) {
       console.log('🔄 Resetting today score for new day:', userId);
       
@@ -68,7 +76,7 @@ async function resetTodayScoreIfNeeded(userId) {
         SET 
           today_crossword_score = 0,
           instant_crossword_score = 0,
-          today_game_completed = FALSE,  -- 🆕 این خط حیاتی
+          today_game_completed = FALSE,
           last_score_reset_date = ${todayDate}
         WHERE id = ${userId}
       `;
