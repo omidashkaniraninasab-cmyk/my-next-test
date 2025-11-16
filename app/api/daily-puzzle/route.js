@@ -13,13 +13,22 @@ export async function GET(request) {
     console.log('🕒 Tehran time:', `${currentHour}:${currentMinute}`);
     
     // 🆕 **اگر ساعت ۹:۰۰-۹:۰۵ است، ریست روزانه انجام بده**
+    let resetInfo = null;
     if (currentHour === 21 && currentMinute <= 5) {
       console.log('🔄 Time for daily reset! Checking if reset is needed...');
       try {
         const resetCount = await resetDailyScores();
+        resetInfo = {
+          resetPerformed: true,
+          resetCount: resetCount
+        };
         console.log(`✅ Daily reset completed for ${resetCount} users`);
       } catch (resetError) {
         console.error('❌ Daily reset failed:', resetError);
+        resetInfo = {
+          resetPerformed: false,
+          error: resetError.message
+        };
       }
     }
     
@@ -35,7 +44,14 @@ export async function GET(request) {
     
     // همیشه از dailyPuzzleData استفاده کن
     console.log('✅ Serving main puzzle');
-    return Response.json(dailyPuzzleData);
+    
+    // 🆕 **اضافه کردن اطلاعات ریست به پاسخ**
+    const responseData = { ...dailyPuzzleData };
+    if (resetInfo) {
+      responseData.dailyReset = resetInfo;
+    }
+    
+    return Response.json(responseData);
     
   } catch (error) {
     console.error('Error:', error);

@@ -128,6 +128,19 @@ useEffect(() => {
   }
 }, [currentUser]);
 
+// 🆕 رفرش خودکار وضعیت کاربر هر 2 دقیقه
+useEffect(() => {
+  if (!currentUser || currentUser.id === 'guest') return;
+  
+  const refreshInterval = setInterval(async () => {
+    console.log('🔄 Auto-refreshing user status...');
+    await checkGameStatus(currentUser.id);
+    await fetchUserStats(currentUser.id);
+  }, 120000); // هر 2 دقیقه
+  
+  return () => clearInterval(refreshInterval);
+}, [currentUser]);
+
 
   const restoreSession = async () => {
     try {
@@ -198,12 +211,22 @@ useEffect(() => {
       const puzzleData = await response.json();
       setDailyPuzzle(puzzleData);
       
-      // 🆕 **اگر بازی باز است، وضعیت todayGameCompleted را چک کن**
+      console.log('✅ Daily puzzle loaded');
+      
+      // 🆕 **اگر ریست روزانه انجام شده، وضعیت کاربر را refresh کن**
+      if (puzzleData.dailyReset && puzzleData.dailyReset.resetPerformed) {
+        console.log('🔄 Daily reset detected, refreshing user status...');
+        if (currentUser && currentUser.id !== 'guest') {
+          await checkGameStatus(currentUser.id);
+          await fetchUserStats(currentUser.id); // وضعیت کاربر رو refresh کن
+        }
+      }
+      
+      // 🆕 **همیشه وضعیت بازی رو چک کن**
       if (currentUser && currentUser.id !== 'guest') {
         await checkGameStatus(currentUser.id);
       }
       
-      console.log('✅ Daily puzzle loaded');
     } else {
       throw new Error('Failed to load puzzle');
     }
@@ -1398,15 +1421,15 @@ const getMotivationalMessage = (accuracy) => {
             </div>
             
             <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-  <h3>🎮 اطلاعات بازی</h3>
- <p><strong>امتیاز کل:</strong> {currentUser.total_crossword_score || 0}</p>
-<p><strong>امتیاز امروز:</strong> {instantScore}</p> {/* 🆕 از instantScore استفاده کن */}
-<p><strong>امتیاز لحظه‌ای:</strong> {instantScore}</p>
-  <p><strong>تعداد بازی‌ها:</strong> {currentUser.crossword_games_played || 0}</p>
-  <p><strong>بازی‌های کامل:</strong> {currentUser.completed_crossword_games || 0}</p>
-  <p><strong>بازی‌های ناتمام:</strong> {currentUser.incomplete_crossword_games || 0}</p>
-  <p><strong>رتبه:</strong> {currentUser.crossword_rank || 'جدید'}</p>
-</div>
+              <h3>🎮 اطلاعات بازی</h3>
+              <p><strong>امتیاز کل:</strong> {currentUser.total_crossword_score || 0}</p>
+              <p><strong>امتیاز امروز:</strong> {instantScore}</p>
+              <p><strong>امتیاز لحظه‌ای:</strong> {instantScore}</p>
+              <p><strong>تعداد بازی‌ها:</strong> {currentUser.crossword_games_played || 0}</p>
+              <p><strong>بازی‌های کامل:</strong> {currentUser.completed_crossword_games || 0}</p>
+              <p><strong>بازی‌های ناتمام:</strong> {currentUser.incomplete_crossword_games || 0}</p>
+              <p><strong>رتبه:</strong> {currentUser.crossword_rank || 'جدید'}</p>
+            </div>
 
             <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
               <h3>⏰ زمان‌بندی</h3>
@@ -1414,432 +1437,439 @@ const getMotivationalMessage = (accuracy) => {
               <p><strong>خروج امروز:</strong> {currentUser.today_logout_time ? new Date(currentUser.today_logout_time).toLocaleString('fa-IR') : 'ثبت نشده'}</p>
             </div>
            
-           {currentUser && (
-  <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-    <GameHistory 
-      userId={currentUser.id} 
-      key={currentUser.id + Date.now()} // 🆕 این خط رو اضافه کن
-    />
-  </div>
-)}
+            {currentUser && (
+              <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+                <GameHistory 
+                  userId={currentUser.id} 
+                  key={currentUser.id + Date.now()}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
 
+      {/* منوی اختصاصی: کارنامه روزانه */}
+      {currentUser && (
+        <div style={{ 
+          marginBottom: '40px', 
+          padding: '25px', 
+          background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+          borderRadius: '15px',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+          color: 'white',
+          border: '2px solid #8b5cf6'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '20px'
+          }}>
+            <div>
+              <h2 style={{ margin: '0 0 10px 0', fontSize: '24px', color: 'white' }}>
+                📊 کارنامه روزانه
+              </h2>
+              <p style={{ margin: 0, opacity: 0.9, fontSize: '14px', color: 'white' }}>
+                عملکرد امروز شما در بازی کراسورد
+              </p>
+            </div>
+          </div>
 
+          {/* کارت‌های اطلاعات - آمار دقیق */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '15px'
+          }}>
+            {/* کارت دقت */}
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              padding: '15px',
+              borderRadius: '10px',
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
+                ✅ دقت پاسخ‌ها
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
+                {dailyPerformance.accuracy}%
+              </div>
+              <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
+                {dailyPerformance.correctCells} از {dailyPerformance.totalCells} خانه
+              </div>
+            </div>
 
-{/* 🆕 منوی اختصاصی: کارنامه روزانه - بدون سطح روز */}
-{currentUser && (
-  <div style={{ 
-    marginBottom: '40px', 
-    padding: '25px', 
-    background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-    borderRadius: '15px',
-    boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-    color: 'white',
-    border: '2px solid #8b5cf6'
-  }}>
-    <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: '20px'
-    }}>
-      <div>
-        <h2 style={{ margin: '0 0 10px 0', fontSize: '24px', color: 'white' }}>
-          📊 کارنامه روزانه
-        </h2>
-        <p style={{ margin: 0, opacity: 0.9, fontSize: '14px', color: 'white' }}>
-          عملکرد امروز شما در بازی کراسورد
-        </p>
-      </div>
-      
-      {/* 🗑️ حذف بخش سطح روز از هدر */}
-    </div>
+            {/* کارت خطا */}
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              padding: '15px',
+              borderRadius: '10px',
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
+                ❌ خانه‌های اشتباه
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
+                {dailyPerformance.uniqueWrongCells}
+              </div>
+              <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
+                از {dailyPerformance.totalCells} خانه
+              </div>
+            </div>
 
-    {/* 🗑️ حذف نوار پیشرفت سطح روز */}
+            {/* کارت اشتباهات کل */}
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              padding: '15px',
+              borderRadius: '10px',
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
+                🔄 کل اشتباهات
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
+                {dailyPerformance.totalMistakes}
+              </div>
+              <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
+                تعداد دفعات اشتباه
+              </div>
+            </div>
 
-    {/* کارت‌های اطلاعات - آمار دقیق */}
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '15px'
-    }}>
-      {/* کارت دقت */}
-      <div style={{
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        padding: '15px',
-        borderRadius: '10px',
-        textAlign: 'center',
-        border: '1px solid rgba(255,255,255,0.3)',
-        color: 'white'
-      }}>
-        <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
-          ✅ دقت پاسخ‌ها
-        </div>
-        <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
-          {dailyPerformance.accuracy}%
-        </div>
-        <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
-          {dailyPerformance.correctCells} از {dailyPerformance.totalCells} خانه
-        </div>
-      </div>
+            {/* کارت جایگاه */}
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              padding: '15px',
+              borderRadius: '10px',
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
+                🏆 جایگاه
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
+                {getPerformanceTitle(dailyPerformance.accuracy)}
+              </div>
+              <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
+                {getPerformanceDescription(dailyPerformance.accuracy)}
+              </div>
+            </div>
+          </div>
 
-      {/* کارت خطا */}
-      <div style={{
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        padding: '15px',
-        borderRadius: '10px',
-        textAlign: 'center',
-        border: '1px solid rgba(255,255,255,0.3)',
-        color: 'white'
-      }}>
-        <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
-          ❌ خانه‌های اشتباه
+          {/* پیام انگیزشی */}
+          <div style={{
+            marginTop: '20px',
+            padding: '15px',
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            borderRadius: '10px',
+            textAlign: 'center',
+            fontSize: '14px',
+            border: '1px solid rgba(255,255,255,0.3)',
+            color: 'white'
+          }}>
+            {getMotivationalMessage(dailyPerformance.accuracy)}
+          </div>
         </div>
-        <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
-          {dailyPerformance.uniqueWrongCells}
-        </div>
-        <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
-          از {dailyPerformance.totalCells} خانه
-        </div>
-      </div>
-
-      {/* کارت اشتباهات کل */}
-      <div style={{
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        padding: '15px',
-        borderRadius: '10px',
-        textAlign: 'center',
-        border: '1px solid rgba(255,255,255,0.3)',
-        color: 'white'
-      }}>
-        <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
-          🔄 کل اشتباهات
-        </div>
-        <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
-          {dailyPerformance.totalMistakes}
-        </div>
-        <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
-          تعداد دفعات اشتباه
-        </div>
-      </div>
-
-      {/* کارت جایگاه */}
-      <div style={{
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        padding: '15px',
-        borderRadius: '10px',
-        textAlign: 'center',
-        border: '1px solid rgba(255,255,255,0.3)',
-        color: 'white'
-      }}>
-        <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
-          🏆 جایگاه
-        </div>
-        <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
-          {getPerformanceTitle(dailyPerformance.accuracy)}
-        </div>
-        <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
-          {getPerformanceDescription(dailyPerformance.accuracy)}
-        </div>
-      </div>
-    </div>
-
-    {/* پیام انگیزشی */}
-    <div style={{
-      marginTop: '20px',
-      padding: '15px',
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      borderRadius: '10px',
-      textAlign: 'center',
-      fontSize: '14px',
-      border: '1px solid rgba(255,255,255,0.3)',
-      color: 'white'
-    }}>
-      {getMotivationalMessage(dailyPerformance.accuracy)}
-    </div>
-  </div>
-)}
-
+      )}
 
       {/* نمودارهای پیشرفت */}
       <ProgressChart users={users} currentUser={currentUser} />
 
-     {/* اطلاعات جدول روزانه */}
-{dailyPuzzle && (
-  <div style={{ 
-    marginBottom: '20px', 
-    padding: '20px', 
-    backgroundColor: dailyPuzzle.closed ? '#fff3cd' : '#e8f5e8', 
-    borderRadius: '10px',
-    textAlign: dailyPuzzle.closed ? 'center' : 'left'
-  }}>
-    {dailyPuzzle.closed ? (
-      // حالت بسته (۸-۹ شب)
-      <div>
-        <h3>⏸️ {dailyPuzzle.title}</h3>
-        <p style={{ margin: '10px 0', fontSize: '16px', color: '#856404' }}>
-          {dailyPuzzle.description}
-        </p>
-        <div style={{ 
-          padding: '15px', 
-          backgroundColor: '#ffeaa7', 
-          borderRadius: '8px',
-          margin: '10px 0'
-        }}>
-          <h4>🏆 نتایج امروز</h4>
-          <p>برندگان امروز به زودی اعلام می‌شوند...</p>
-          <p style={{ fontWeight: 'bold', marginTop: '10px' }}>
-            ⏰ بازی بعدی: ساعت {dailyPuzzle.nextOpenTime}
-          </p>
-        </div>
-      </div>
-    ) : (
-      // حالت باز
-      <div>
-        <h3>📅 جدول روزانه</h3>
-        <p style={{ margin: '5px 0', fontWeight: 'bold' }}>{dailyPuzzle.title}</p>
-        <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
-          سایز: {dailyPuzzle.size}×{dailyPuzzle.size} | 
-          تاریخ: {dailyPuzzle.date}
-        </p>
-      </div>
-    )}
-  </div>
-)}
-
-{/* بازی کراسورد */}
-<div style={{ marginBottom: '40px' }}>
-  {/* اگر کاربر لاگین نکرده باشد */}
-  {!currentUser && (
-    <div style={{ 
-      padding: '40px', 
-      textAlign: 'center', 
-      backgroundColor: '#fff3cd', 
-      borderRadius: '10px',
-      marginBottom: '20px'
-    }}>
-      <h3>⚠️ برای بازی باید ثبت‌نام کنید</h3>
-      <p>لطفاً در فرم زیر ثبت‌نام کنید تا بتوانید بازی کنید</p>
-    </div>
-  )}
-
-  {/* اگر بازی بسته است (۸-۹ شب) */}
-  {dailyPuzzle?.closed && currentUser && (
-    <div style={{ 
-      padding: '40px', 
-      textAlign: 'center', 
-      backgroundColor: '#fff3cd', 
-      borderRadius: '10px',
-      marginBottom: '20px'
-    }}>
-      <h3>⏸️ بازی موقتاً تعطیل است</h3>
-      <p>در حال به‌روزرسانی جدول جدید... ساعت ۹ شب بر می گردیم! 🎯</p>
-    </div>
-  )}
-
-  {/* بازی فعال - فقط وقتی کاربر لاگین کرده، بازی باز است و هنوز بازی نکرده */}
-  {!dailyPuzzle?.closed && currentUser && !todayGameCompleted && !gameCompleted && (
-    <div style={{ marginBottom: '40px' }}>
-      {/* محتوای جدول و صفحه کلید */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: `repeat(${dailyPuzzle ? dailyPuzzle.size : 6}, 60px)`,
-        gap: '2px',
-        marginBottom: '20px'
-      }}>
-        {dailyPuzzle && dailyPuzzle.grid.map((row, rowIndex) => (
-          row.map((cell, colIndex) => (
-            <div
-              key={`${rowIndex}-${colIndex}`}
-              onClick={() => currentUser && handleCellSelect(rowIndex, colIndex)}
-              style={{
-                width: '60px',
-                height: '60px',
-                backgroundColor: cell === 0 ? '#333' : 
-                  selectedCell[0] === rowIndex && selectedCell[1] === colIndex ? '#0070f3' :
-                  cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '#2E7D32' :
-                  cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct' ? '#4CAF50' :
-                  cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'wrong' ? '#f44336' : '#fff',
-                border: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '2px solid #1B5E20' : '2px solid #ccc',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '20px',
-                fontWeight: 'bold',
-                cursor: currentUser && cell === 1 && cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] !== 'locked' && !gameCompleted ? 'pointer' : 'default',
-                color: (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked') || (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct') ? '#fff' : '#000',
-                transition: 'all 0.2s',
-                opacity: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? 0.8 : 1
-              }}
-            >
-              {userInput[rowIndex] && userInput[rowIndex][colIndex] !== undefined ? userInput[rowIndex][colIndex] : ''}
-              {cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' && ' 🔒'}
-            </div>
-          ))
-        ))}
-      </div>
-
-      {/* راهنما */}
+      {/* اطلاعات جدول روزانه */}
       {dailyPuzzle && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '14px' }}>
-          <div>
-            <h3>➡️ افقی</h3>
-            {Object.entries(dailyPuzzle.across).map(([num, clue]) => (
-              <p key={num} style={{ margin: '5px 0' }}>
-                <strong>{num}:</strong> {clue.clue}
+        <div style={{ 
+          marginBottom: '20px', 
+          padding: '20px', 
+          backgroundColor: dailyPuzzle.closed ? '#fff3cd' : '#e8f5e8', 
+          borderRadius: '10px',
+          textAlign: dailyPuzzle.closed ? 'center' : 'left'
+        }}>
+          {dailyPuzzle.closed ? (
+            // حالت بسته (۸-۹ شب)
+            <div>
+              <h3>⏸️ {dailyPuzzle.title}</h3>
+              <p style={{ margin: '10px 0', fontSize: '16px', color: '#856404' }}>
+                {dailyPuzzle.description}
               </p>
-            ))}
-          </div>
-          <div>
-            <h3>⬇️ عمودی</h3>
-            {Object.entries(dailyPuzzle.down).map(([num, clue]) => (
-              <p key={num} style={{ margin: '5px 0' }}>
-                <strong>{num}:</strong> {clue.clue}
+              <div style={{ 
+                padding: '15px', 
+                backgroundColor: '#ffeaa7', 
+                borderRadius: '8px',
+                margin: '10px 0'
+              }}>
+                <h4>🏆 نتایج امروز</h4>
+                <p>برندگان امروز به زودی اعلام می‌شوند...</p>
+                <p style={{ fontWeight: 'bold', marginTop: '10px' }}>
+                  ⏰ بازی بعدی: ساعت {dailyPuzzle.nextOpenTime}
+                </p>
+              </div>
+            </div>
+          ) : (
+            // حالت باز
+            <div>
+              <h3>📅 جدول روزانه</h3>
+              <p style={{ margin: '5px 0', fontWeight: 'bold' }}>{dailyPuzzle.title}</p>
+              <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
+                سایز: {dailyPuzzle.size}×{dailyPuzzle.size} | 
+                تاریخ: {dailyPuzzle.date}
               </p>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* صفحه کلید - فقط وقتی بازی باز است */}
-      {!gameCompleted && (
-        <div style={{ marginBottom: '30px' }}>
-          <h3>صفحه کلید</h3>
-          {persianKeyboard.map((row, rowIndex) => (
-            <div key={rowIndex} style={{ 
-              display: 'flex', 
-              justifyContent: 'center', 
-              gap: '5px', 
-              marginBottom: '10px' 
+      {/* بازی کراسورد */}
+      <div style={{ marginBottom: '40px' }}>
+        {/* اگر کاربر لاگین نکرده باشد */}
+        {!currentUser && (
+          <div style={{ 
+            padding: '40px', 
+            textAlign: 'center', 
+            backgroundColor: '#fff3cd', 
+            borderRadius: '10px',
+            marginBottom: '20px'
+          }}>
+            <h3>⚠️ برای بازی باید ثبت‌نام کنید</h3>
+            <p>لطفاً در فرم زیر ثبت‌نام کنید تا بتوانید بازی کنید</p>
+          </div>
+        )}
+
+        {/* اگر بازی بسته است (۸-۹ شب) */}
+        {dailyPuzzle?.closed && currentUser && (
+          <div style={{ 
+            padding: '40px', 
+            textAlign: 'center', 
+            backgroundColor: '#fff3cd', 
+            borderRadius: '10px',
+            marginBottom: '20px'
+          }}>
+            <h3>⏸️ بازی موقتاً تعطیل است</h3>
+            <p>در حال به‌روزرسانی جدول جدید... ساعت ۹ شب بر می گردیم! 🎯</p>
+          </div>
+        )}
+
+        {/* بازی فعال - فقط وقتی کاربر لاگین کرده، بازی باز است و هنوز بازی نکرده */}
+        {!dailyPuzzle?.closed && currentUser && !todayGameCompleted && !gameCompleted && (
+          <div style={{ marginBottom: '40px' }}>
+            {/* محتوای جدول و صفحه کلید */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: `repeat(${dailyPuzzle ? dailyPuzzle.size : 6}, 60px)`,
+              gap: '2px',
+              marginBottom: '20px'
             }}>
-              {row.map(char => (
-                <div
-                  key={char}
-                  onClick={() => handleInput(char)}
-                  style={{
-                    padding: '10px 15px',
-                    fontSize: '16px',
-                    border: '1px solid #ccc',
-                    backgroundColor: '#f0f0f0',
-                    cursor: 'pointer',
-                    borderRadius: '5px',
-                    minWidth: '40px',
-                    textAlign: 'center'
-                  }}
-                >
-                  {char}
-                </div>
+              {dailyPuzzle && dailyPuzzle.grid.map((row, rowIndex) => (
+                row.map((cell, colIndex) => (
+                  <div
+                    key={`${rowIndex}-${colIndex}`}
+                    onClick={() => currentUser && handleCellSelect(rowIndex, colIndex)}
+                    style={{
+                      width: '60px',
+                      height: '60px',
+                      backgroundColor: cell === 0 ? '#333' : 
+                        selectedCell[0] === rowIndex && selectedCell[1] === colIndex ? '#0070f3' :
+                        cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '#2E7D32' :
+                        cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct' ? '#4CAF50' :
+                        cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'wrong' ? '#f44336' : '#fff',
+                      border: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '2px solid #1B5E20' : '2px solid #ccc',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '20px',
+                      fontWeight: 'bold',
+                      cursor: currentUser && cell === 1 && cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] !== 'locked' && !gameCompleted ? 'pointer' : 'default',
+                      color: (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked') || (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct') ? '#fff' : '#000',
+                      transition: 'all 0.2s',
+                      opacity: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? 0.8 : 1
+                    }}
+                  >
+                    {userInput[rowIndex] && userInput[rowIndex][colIndex] !== undefined ? userInput[rowIndex][colIndex] : ''}
+                    {cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' && ' 🔒'}
+                  </div>
+                ))
               ))}
             </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )}
 
-  {/* پیام بعد از اتمام بازی - کاربر امروز بازی کرده */}
-  // شرط درست برای نمایش پیغام
-{(todayGameCompleted && currentUser && !gameCompleted) && (
-  <div style={{ 
-    padding: '40px', 
-    textAlign: 'center', 
-    backgroundColor: '#fff3cd', 
-    borderRadius: '10px',
-    marginBottom: '20px'
-  }}>
-    <h3>⏸️ بازی امروز قفل شد</h3>
-    <p style={{ margin: '10px 0', color: '#666' }}>
-      شما بازی امروز رو کامل نکردید. ساعت ۹ شب با جدول جدید برگردید!
-    </p>
-  </div>
-)}
-
-{gameCompleted && currentUser && (
-  <div style={{ 
-    padding: '40px', 
-    textAlign: 'center', 
-    backgroundColor: '#e8f5e8', 
-    borderRadius: '10px',
-    marginBottom: '20px'
-  }}>
-    <h3>✅ بازی امروز تکمیل شد!</h3>
-    <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '10px 0' }}>
-      🎯 امتیاز شما امروز: <strong>{currentUser.today_crossword_score}</strong>
-    </p>
-    <p style={{ margin: '10px 0', color: '#666' }}>
-      ⏰ ساعت ۹ شب با جدول جدید بر می گردیم! 🎯
-    </p>
-  </div>
-)}
-</div>
-
-{/* لیست کاربران - مرتب شده بر اساس امتیاز کل */}
-<div>
-  <h2>رده‌بندی کاربران</h2>
-  <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
-    🔄 به روزرسانی خودکار هر یک دقیقه - مرتب شده بر اساس امتیاز
-  </div>
-  {users.length === 0 ? (
-    <p>هنوز کاربری ثبت‌نام نکرده است</p>
-  ) : (
-    <div style={{ display: 'grid', gap: '10px' }}>
-      {users
-        .sort((a, b) => (b.total_crossword_score || 0) - (a.total_crossword_score || 0))
-        .map((user, index) => (
-          <div key={user.id} style={{ 
-            padding: '15px', 
-            border: '1px solid #ddd', 
-            borderRadius: '8px',
-            backgroundColor: currentUser && user.id === currentUser.id ? '#e3f2fd' : '#f9f9f9',
-            borderLeft: currentUser && user.id === currentUser.id ? '4px solid #0070f3' : '1px solid #ddd'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '30px',
-                  height: '30px',
-                  backgroundColor: index === 0 ? '#FFD700' : 
-                                 index === 1 ? '#C0C0C0' : 
-                                 index === 2 ? '#CD7F32' : '#0070f3',
-                  color: 'white',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
-                }}>
-                  {index + 1}
+            {/* راهنما */}
+            {dailyPuzzle && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '14px' }}>
+                <div>
+                  <h3>➡️ افقی</h3>
+                  {Object.entries(dailyPuzzle.across).map(([num, clue]) => (
+                    <p key={num} style={{ margin: '5px 0' }}>
+                      <strong>{num}:</strong> {clue.clue}
+                    </p>
+                  ))}
                 </div>
                 <div>
-                  <strong>{user.username}</strong> - {user.first_name} {user.last_name}
-                  {currentUser && user.id === currentUser.id && <span style={{color: 'green', marginRight: '10px'}}> (شما)</span>}
-                  <br />
-                  📧 {user.email}
-                  <br />
-                  🎮 بازی‌ها: {user.crossword_games_played || 0}
+                  <h3>⬇️ عمودی</h3>
+                  {Object.entries(dailyPuzzle.down).map(([num, clue]) => (
+                    <p key={num} style={{ margin: '5px 0' }}>
+                      <strong>{num}:</strong> {clue.clue}
+                    </p>
+                  ))}
                 </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#0070f3' }}>
-                  🎯 {user.total_crossword_score || 0}
-                </div>
-                <div style={{ fontSize: '12px', color: '#666' }}>
-                  ⏰ {new Date(user.registration_date).toLocaleDateString('fa-IR')}
-                </div>
-                {index === 0 && <div style={{ fontSize: '12px', color: '#FFD700' }}>🥇 طلایی</div>}
-                {index === 1 && <div style={{ fontSize: '12px', color: '#C0C0C0' }}>🥈 نقره‌ای</div>}
-                {index === 2 && <div style={{ fontSize: '12px', color: '#CD7F32' }}>🥉 برنزی</div>}
+            )}
+
+            {/* صفحه کلید - فقط وقتی بازی باز است */}
+            {!gameCompleted && (
+              <div style={{ marginBottom: '30px' }}>
+                <h3>صفحه کلید</h3>
+                {persianKeyboard.map((row, rowIndex) => (
+                  <div key={rowIndex} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    gap: '5px', 
+                    marginBottom: '10px' 
+                  }}>
+                    {row.map(char => (
+                      <div
+                        key={char}
+                        onClick={() => handleInput(char)}
+                        style={{
+                          padding: '10px 15px',
+                          fontSize: '16px',
+                          border: '1px solid #ccc',
+                          backgroundColor: '#f0f0f0',
+                          cursor: 'pointer',
+                          borderRadius: '5px',
+                          minWidth: '40px',
+                          textAlign: 'center'
+                        }}
+                      >
+                        {char}
+                      </div>
+                    ))}
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
           </div>
-        ))
-      }
-    </div>
-  )}
-</div>
+        )}
+
+        {/* پیام برای وقتی که بازی جدید آماده است اما وضعیت به روز نیست */}
+        {!dailyPuzzle?.closed && currentUser && todayGameCompleted && (
+          <div style={{ 
+            padding: '30px', 
+            textAlign: 'center', 
+            backgroundColor: '#e8f5e8', 
+            borderRadius: '10px',
+            marginBottom: '20px',
+            border: '2px solid #4CAF50'
+          }}>
+            <h3>🔄 بازی جدید آماده است!</h3>
+            <p style={{ margin: '15px 0', fontSize: '16px' }}>جدول روزانه جدید بارگذاری شد. برای شروع بازی جدید صفحه را رفرش کنید.</p>
+            <button 
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: '#4CAF50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: 'bold'
+              }}
+            >
+              🔄 رفرش صفحه برای بازی جدید
+            </button>
+          </div>
+        )}
+
+        {/* پیام بعد از اتمام بازی */}
+        {gameCompleted && currentUser && (
+          <div style={{ 
+            padding: '40px', 
+            textAlign: 'center', 
+            backgroundColor: '#e8f5e8', 
+            borderRadius: '10px',
+            marginBottom: '20px'
+          }}>
+            <h3>✅ بازی امروز تکمیل شد!</h3>
+            <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '10px 0' }}>
+              🎯 امتیاز شما امروز: <strong>{currentUser.today_crossword_score}</strong>
+            </p>
+            <p style={{ margin: '10px 0', color: '#666' }}>
+              ⏰ ساعت ۹ شب با جدول جدید بر می گردیم! 🎯
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* لیست کاربران - مرتب شده بر اساس امتیاز کل */}
+      <div>
+        <h2>رده‌بندی کاربران</h2>
+        <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
+          🔄 به روزرسانی خودکار هر یک دقیقه - مرتب شده بر اساس امتیاز
+        </div>
+        {users.length === 0 ? (
+          <p>هنوز کاربری ثبت‌نام نکرده است</p>
+        ) : (
+          <div style={{ display: 'grid', gap: '10px' }}>
+            {users
+              .sort((a, b) => (b.total_crossword_score || 0) - (a.total_crossword_score || 0))
+              .map((user, index) => (
+                <div key={user.id} style={{ 
+                  padding: '15px', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '8px',
+                  backgroundColor: currentUser && user.id === currentUser.id ? '#e3f2fd' : '#f9f9f9',
+                  borderLeft: currentUser && user.id === currentUser.id ? '4px solid #0070f3' : '1px solid #ddd'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        width: '30px',
+                        height: '30px',
+                        backgroundColor: index === 0 ? '#FFD700' : 
+                                       index === 1 ? '#C0C0C0' : 
+                                       index === 2 ? '#CD7F32' : '#0070f3',
+                        color: 'white',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                      }}>
+                        {index + 1}
+                      </div>
+                      <div>
+                        <strong>{user.username}</strong> - {user.first_name} {user.last_name}
+                        {currentUser && user.id === currentUser.id && <span style={{color: 'green', marginRight: '10px'}}> (شما)</span>}
+                        <br />
+                        📧 {user.email}
+                        <br />
+                        🎮 بازی‌ها: {user.crossword_games_played || 0}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#0070f3' }}>
+                        🎯 {user.total_crossword_score || 0}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#666' }}>
+                        ⏰ {new Date(user.registration_date).toLocaleDateString('fa-IR')}
+                      </div>
+                      {index === 0 && <div style={{ fontSize: '12px', color: '#FFD700' }}>🥇 طلایی</div>}
+                      {index === 1 && <div style={{ fontSize: '12px', color: '#C0C0C0' }}>🥈 نقره‌ای</div>}
+                      {index === 2 && <div style={{ fontSize: '12px', color: '#CD7F32' }}>🥉 برنزی</div>}
+                    </div>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        )}
+      </div>
     </div>
   );
 }
