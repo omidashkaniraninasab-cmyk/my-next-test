@@ -7,7 +7,7 @@ export async function POST(request) {
   try {
     const { gameId, userId, finalScore } = await request.json();
     
-    console.log('🎯 Marking game as completed for user:', userId);
+    console.log('🎯 Marking game as completed for user:', userId, 'Final Score:', finalScore);
 
     // ✅ آپدیت وضعیت بازی
     await sql`
@@ -27,9 +27,13 @@ export async function POST(request) {
     // ✅ آپدیت وضعیت کاربر - بازی امروز تکمیل شد
     await sql`
       UPDATE user_profiles 
-      SET today_game_completed = TRUE
+      SET 
+        today_game_completed = TRUE,
+        total_crossword_score = COALESCE(total_crossword_score, 0) + ${finalScore}
       WHERE id = ${userId}
     `;
+
+    console.log('✅ Final score added to total score:', finalScore);
 
     return Response.json({ 
       success: true,

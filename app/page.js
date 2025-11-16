@@ -145,6 +145,8 @@ useEffect(() => {
 }, [currentUser]);
 
 
+
+
   const restoreSession = async () => {
     try {
       console.log('🔄 Restoring session after page refresh...');
@@ -202,10 +204,12 @@ const loadDailyPuzzle = async () => {
       
       console.log('✅ Daily puzzle loaded');
       
-      // 🆕 **همیشه وضعیت کاربر را بعد از بارگذاری بازی refresh کن**
+      // 🆕 **رفرش وضعیت کاربر فقط اگر لازم باشد - با تاخیر**
       if (currentUser && currentUser.id !== 'guest') {
-        await checkGameStatus(currentUser.id);
-        await fetchUserStats(currentUser.id);
+        setTimeout(async () => {
+          await checkGameStatus(currentUser.id);
+          await fetchUserStats(currentUser.id);
+        }, 500);
       }
       
     } else {
@@ -275,34 +279,44 @@ const loadDailyPuzzle = async () => {
     }
   };
 
-  const fetchUserStats = async (userId) => {
-    try {
-      console.log('🔄 Fetching user stats for:', userId);
+ const fetchUserStats = async (userId) => {
+  try {
+    console.log('🔄 Fetching user stats for:', userId);
+    
+    const response = await fetch('/api/users');
+    if (response.ok) {
+      const userData = await response.json();
+      const currentUserData = userData.find(user => user.id === userId);
       
-      const response = await fetch('/api/users');
-      if (response.ok) {
-        const userData = await response.json();
-        const currentUserData = userData.find(user => user.id === userId);
+      if (currentUserData) {
+        console.log('📊 User stats loaded:', {
+          id: currentUserData.id,
+          total: currentUserData.total_crossword_score,
+          today: currentUserData.today_crossword_score,
+          games: currentUserData.crossword_games_played
+        });
         
-        if (currentUserData) {
-          console.log('📊 User stats loaded:', {
-            id: currentUserData.id,
-            total: currentUserData.total_crossword_score,
-            today: currentUserData.today_crossword_score,
-            games: currentUserData.crossword_games_played
-          });
-          
-          setCurrentUser(currentUserData);
-        } else {
-          console.log('❌ User not found in user list');
-        }
+        // 🆕 **فقط اگر داده واقعاً تغییر کرده باشه، state رو آپدیت کن**
+        setCurrentUser(prevUser => {
+          if (prevUser && 
+              prevUser.total_crossword_score === currentUserData.total_crossword_score &&
+              prevUser.today_crossword_score === currentUserData.today_crossword_score) {
+            console.log('🔄 No changes in user stats, skipping update');
+            return prevUser;
+          }
+          console.log('✅ User stats updated');
+          return currentUserData;
+        });
       } else {
-        console.error('❌ Error fetching users:', response.status);
+        console.log('❌ User not found in user list');
       }
-    } catch (error) {
-      console.error('❌ Error:', error);
+    } else {
+      console.error('❌ Error fetching users:', response.status);
     }
-  };
+  } catch (error) {
+    console.error('❌ Error:', error);
+  }
+};
 
   const fetchUsers = async () => {
     try {
@@ -357,7 +371,8 @@ const loadDailyPuzzle = async () => {
   }
 };
 
- const updateUserScoreInDB = async (userId, additionalScore, currentInstantScore) => {
+ // تابع آپدیت امتیاز در دیتابیس - اصلاح شده
+const updateUserScoreInDB = async (userId, additionalScore, currentInstantScore) => {
   try {
     const response = await fetch('/api/users/update-score', {
       method: 'POST',
@@ -379,6 +394,7 @@ const loadDailyPuzzle = async () => {
     console.error('Error updating score:', error);
   }
 };
+
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -522,7 +538,8 @@ const loadDailyPuzzle = async () => {
     }
   };
 
- const handleInput = async (char) => {
+// تابع handleInput - اصلاح شده
+const handleInput = async (char) => {
   console.log('🎮 handleInput called with char:', char);
 
   if (gameCompleted || !currentUser || !currentGameId || !dailyPuzzle) {
@@ -537,7 +554,7 @@ const loadDailyPuzzle = async () => {
     return;
   }
 
-  // ✅ **مهم: اول first-input رو صدا بزن، بعد بقیه منطق**
+  // ✅ اول first-input رو صدا بزن
   if (!firstInputSent) {
     console.log('🚀 Sending first-input request...');
     try {
@@ -551,21 +568,12 @@ const loadDailyPuzzle = async () => {
         })
       });
       
-      console.log('📡 First-input response status:', response.status);
-      
       if (response.ok) {
-        const result = await response.json();
-        console.log('✅ First input recorded successfully:', result);
         setFirstInputSent(true);
-      } else {
-        const errorText = await response.text();
-        console.error('❌ First-input API error:', response.status, errorText);
       }
     } catch (error) {
       console.error('❌ Error recording first input:', error);
     }
-  } else {
-    console.log('ℹ️ First input already sent');
   }
 
   // بقیه منطق ورود...
@@ -582,26 +590,18 @@ const loadDailyPuzzle = async () => {
     newCellStatus[row][col] = 'locked';
     scoreToAdd = 3; // 🎯 برای هر خانه درست
     
-    // 🆕 **اضافه کردن XP برای خانه درست**
+    // اضافه کردن XP برای خانه درست
     try {
-      const xpResponse = await fetch('/api/user/level', {
+      await fetch('/api/user/level', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: currentUser.id,
-          xp: 10, // XP برای هر خانه درست
+          xp: 10,
           reason: 'پر کردن خانه کراسورد'
         })
       });
-      
-      if (xpResponse.ok) {
-        const xpResult = await xpResponse.json();
-        console.log('✅ XP added for correct cell:', xpResult);
-        await fetchUserLevel(currentUser.id);
-      } else {
-        console.error('❌ XP API error:', xpResponse.status);
-      }
-      
+      await fetchUserLevel(currentUser.id);
     } catch (error) {
       console.error('❌ Error adding XP:', error);
     }
@@ -611,33 +611,24 @@ const loadDailyPuzzle = async () => {
     scoreToAdd = -3; // 🎯 برای هر خانه اشتباه
     setMistakes(mistakes + 1);
     
-    // 🆕 **ثبت اشتباه در تاریخچه**
+    // ثبت اشتباه در تاریخچه
     const cellKey = `${row}-${col}`;
     setMistakeHistory(prev => ({
       ...prev,
       [cellKey]: (prev[cellKey] || 0) + 1
     }));
-    console.log('📝 Mistake recorded in history for cell:', cellKey);
   }
 
-  // 🆕 **آپدیت همه امتیازها بلافاصله**
+  // 🆕 **آپدیت امتیازها - اصلاح شده**
   const newInstantScore = instantScore + scoreToAdd;
+  const newTotalScore = score + scoreToAdd;
+  
   setInstantScore(newInstantScore);
-  setScore(score + scoreToAdd);
+  setScore(newTotalScore);
 
-  // 🆕 **آپدیت فوری در دیتابیس**
+  // 🆕 **آپدیت فوری در دیتابیس - اصلاح شده**
   try {
-    await fetch('/api/users/update-score', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId: currentUser.id,
-        additionalScore: scoreToAdd, // 🎯 هم به امروز و هم به کل اضافه شود
-        currentInstantScore: newInstantScore
-      }),
-    });
+    await updateUserScoreInDB(currentUser.id, scoreToAdd, newInstantScore);
     console.log('✅ Score updated in database:', scoreToAdd);
   } catch (error) {
     console.error('❌ Error updating score:', error);
@@ -645,12 +636,11 @@ const loadDailyPuzzle = async () => {
 
   setCellStatus(newCellStatus);
 
-  // 🆕 **بروزرسانی عملکرد روزانه بعد از هر حرکت**
+  // بروزرسانی عملکرد روزانه
   const updatedPerformance = calculateDailyPerformance();
   setDailyPerformance(updatedPerformance);
-  console.log('📊 Daily performance updated:', updatedPerformance);
 
-  await saveGameStateToServer(newInput, newCellStatus, score + scoreToAdd, mistakes + (isCorrect ? 0 : 1));
+  await saveGameStateToServer(newInput, newCellStatus, newTotalScore, mistakes + (isCorrect ? 0 : 1));
 
   if (!isCorrect) {
     moveToNextCell(row, col);
@@ -703,6 +693,7 @@ const loadDailyPuzzle = async () => {
     checkGameCompletion();
   };
 
+// تابع checkGameCompletion - اصلاح شده
 const checkGameCompletion = async () => {
   if (!dailyPuzzle) return;
   
@@ -725,21 +716,11 @@ const checkGameCompletion = async () => {
 
     setGameCompleted(true);
     setTodayGameCompleted(true);
-    setInstantScore(0); // 🎯 فقط امتیاز لحظه‌ای صفر شود
+    setInstantScore(0);
     
     try {
-      // 🆕 **فقط bonus به امتیازها اضافه شود (امتیاز لحظه‌ای صفر)**
-      await fetch('/api/users/update-score', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: currentUser.id,
-          additionalScore: bonusScore, // فقط bonus اضافه شود
-          currentInstantScore: 0 // 🎯 امتیاز لحظه‌ای صفر
-        }),
-      });
+      // 🆕 **اضافه کردن bonus به امتیازها**
+      await updateUserScoreInDB(currentUser.id, bonusScore, 0);
       console.log('✅ Bonus score added');
 
       // تکمیل بازی
@@ -756,14 +737,14 @@ const checkGameCompletion = async () => {
       });
       console.log('✅ Game status completed');
 
-      // 🆕 **اضافه کردن XP برای بازی کامل**
+      // اضافه کردن XP برای بازی کامل
       try {
         await fetch('/api/user/level', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: currentUser.id,
-            xp: 100, // XP برای بازی کامل
+            xp: 100,
             reason: 'اتمام بازی کراسورد'
           })
         });
@@ -772,7 +753,7 @@ const checkGameCompletion = async () => {
         console.error('❌ Error adding XP for completion:', error);
       }
 
-      // 🆕 **ذخیره تاریخچه**
+      // ذخیره تاریخچه
       setTimeout(async () => {
         try {
           const userResponse = await fetch('/api/users');
@@ -786,7 +767,7 @@ const checkGameCompletion = async () => {
                 currentGameId, 
                 dailyPuzzle, 
                 mistakes,
-                freshUserData.today_crossword_score // امتیاز امروز
+                freshUserData.today_crossword_score
               );
               console.log('✅ Game history saved');
             }
