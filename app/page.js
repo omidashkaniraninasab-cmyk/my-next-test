@@ -691,7 +691,10 @@ const handleInput = async (char) => {
 
 // تابع checkGameCompletion - اصلاح شده
 const checkGameCompletion = async () => {
-  if (!dailyPuzzle) return;
+  if (!dailyPuzzle || gameCompleted) {
+    console.log('❌ Game completion check skipped - no puzzle or already completed');
+    return;
+  }
   
   let allLocked = true;
   
@@ -710,17 +713,31 @@ const checkGameCompletion = async () => {
     
     console.log('🎯 Game completed! Adding bonus:', bonusScore);
 
+    // 🆕 اول stateها رو آپدیت کن تا از اجرای مجدد جلوگیری بشه
     setGameCompleted(true);
     setTodayGameCompleted(true);
     setInstantScore(0);
     
     try {
-      // 🆕 **اضافه کردن bonus به امتیازها**
-      await updateUserScoreInDB(currentUser.id, bonusScore, 0);
-      console.log('✅ Bonus score added');
+      console.log('💰 Adding bonus to today score...');
+      
+      // 🆕 فقط bonus به امتیاز امروز اضافه شود
+      await fetch('/api/users/update-score', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          additionalScore: bonusScore, // فقط 50 به امروز اضافه کن
+          currentInstantScore: 0
+        }),
+      });
+      console.log('✅ Bonus score added to today score');
 
-      // تکمیل بازی
-      await fetch('/api/game/complete', {
+      // 🆕 تکمیل بازی - اینجا فقط 50 به کل اضافه میشه
+      console.log('🏁 Marking game as completed...');
+      const completeResponse = await fetch('/api/game/complete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -731,9 +748,16 @@ const checkGameCompletion = async () => {
           userId: currentUser.id
         }),
       });
-      console.log('✅ Game status completed');
+      
+      if (completeResponse.ok) {
+        console.log('✅ Game completion recorded - 50 points added to total');
+      } else {
+        const errorText = await completeResponse.text();
+        console.error('❌ Game completion failed:', completeResponse.status, errorText);
+      }
 
-      // اضافه کردن XP برای بازی کامل
+      // 🆕 اضافه کردن XP برای بازی کامل
+      console.log('⭐ Adding XP for game completion...');
       try {
         await fetch('/api/user/level', {
           method: 'POST',
@@ -749,9 +773,10 @@ const checkGameCompletion = async () => {
         console.error('❌ Error adding XP for completion:', error);
       }
 
-      // ذخیره تاریخچه
+      // 🆕 ذخیره تاریخچه با تاخیر
       setTimeout(async () => {
         try {
+          console.log('💾 Saving game to history...');
           const userResponse = await fetch('/api/users');
           if (userResponse.ok) {
             const usersData = await userResponse.json();
@@ -774,12 +799,17 @@ const checkGameCompletion = async () => {
       }, 1000);
 
     } catch (error) {
-      console.error('❌ Error in game completion:', error);
+      console.error('❌ Error in game completion process:', error);
     }
 
     // بروزرسانی منوی پیشرفت
+    console.log('🔄 Refreshing user stats and level...');
     await fetchUserLevel(currentUser.id);
     await fetchUserStats(currentUser.id);
+    
+    console.log('🎉 Game completion process finished successfully');
+  } else {
+    console.log('🔍 Game not completed yet - still', dailyPuzzle.size * dailyPuzzle.size - cellStatus.flat().filter(status => status === 'locked').length, 'cells remaining');
   }
 };
 
