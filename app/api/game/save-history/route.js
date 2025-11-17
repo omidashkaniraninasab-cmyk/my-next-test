@@ -1,5 +1,4 @@
 import { neon } from '@neondatabase/serverless';
-import { saveGameToHistory } from '@/lib/db';
 
 const sql = neon(process.env.DATABASE_URL);
 
@@ -15,43 +14,53 @@ export async function POST(request) {
     console.log('🔍 Parsed parameters:', {
       userId,
       gameId, 
-      todayScore, // 🆕 این رو چک کن
-      mistakes,
-      hasPuzzleData: !!puzzleData
+      todayScore,
+      mistakes
     });
 
     if (!userId || !gameId) {
-      console.log('❌ Missing required fields:', { userId, gameId });
       return Response.json({ 
-        error: 'User ID and Game ID required',
-        received: { userId, gameId }
+        error: 'User ID and Game ID required'
       }, { status: 400 });
     }
 
-    console.log('💾 Starting to save game history...');
+    console.log('💾 Starting DIRECT database insert...');
     
-    const score = todayScore || 0; // 🆕 این درسته
-    const completionTime = null;
+    const score = todayScore || 0;
 
-    console.log('🔍 Calling saveGameToHistory function with score:', score);
+    // 🆕 INSERT مستقیم به دیتابیس
+    const result = await sql`
+      INSERT INTO game_history (
+        user_id, 
+        game_id, 
+        puzzle_title, 
+        puzzle_size, 
+        score, 
+        mistakes, 
+        completion_time,
+        created_at
+      ) 
+      VALUES (
+        ${userId}, 
+        ${gameId}, 
+        ${puzzleData?.title || 'جدول روزانه'}, 
+        ${puzzleData?.size || 6}, 
+        ${score}, 
+        ${mistakes}, 
+        ${null},
+        CURRENT_TIMESTAMP  -- 🎯 این تاریخ امروز رو می‌گیره
+      )
+      RETURNING id, score, created_at
+    `;
 
-    // 🆕 **درستش کن - todayScore رو پاس بده**
-    const result = await saveGameToHistory(
-      userId, 
-      gameId, 
-      puzzleData, 
-      score, // 🎯 این todayScore هست که درست مقداردهی شده
-      mistakes, 
-      completionTime
-    );
-    
-    console.log('✅ saveGameToHistory result:', result);
+    console.log('✅ DIRECT INSERT - Result:', result[0]);
 
     return Response.json({ 
       success: true,
       message: 'بازی در تاریخچه ذخیره شد',
       score: score,
-      historyId: result?.id
+      historyId: result[0]?.id,
+      createdAt: result[0]?.created_at
     });
     
   } catch (error) {
