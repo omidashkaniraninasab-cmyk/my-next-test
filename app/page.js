@@ -710,9 +710,18 @@ const checkGameCompletion = async () => {
 
   if (allLocked && !gameCompleted) {
     const bonusScore = 50;
-    const finalTodayScore = score + bonusScore; // 🎯 امتیاز نهایی
     
-    console.log('🎯 Game completed! Final score:', finalTodayScore);
+    // 🆕 محاسبه امتیاز نهایی - از هر دو state استفاده کن
+    const gameScore = Math.max(instantScore, score); // بزرگترین مقدار رو بگیر
+    const finalTodayScore = gameScore + bonusScore;
+    
+    console.log('🎯 Game completed! Scores:', {
+      instantScore,
+      score,
+      gameScore,
+      bonusScore,
+      finalTodayScore
+    });
 
     setGameCompleted(true);
     setTodayGameCompleted(true);
@@ -721,7 +730,6 @@ const checkGameCompletion = async () => {
     try {
       console.log('💰 Adding bonus to today score...');
       
-      // اضافه کردن bonus به امتیاز امروز
       await fetch('/api/users/update-score', {
         method: 'POST',
         headers: {
@@ -735,7 +743,6 @@ const checkGameCompletion = async () => {
       });
       console.log('✅ Bonus score added to today score');
 
-      // تکمیل بازی
       console.log('🏁 Marking game as completed...');
       const completeResponse = await fetch('/api/game/complete', {
         method: 'POST',
@@ -756,7 +763,6 @@ const checkGameCompletion = async () => {
         console.error('❌ Game completion failed:', completeResponse.status, errorText);
       }
 
-      // اضافه کردن XP برای بازی کامل
       console.log('⭐ Adding XP for game completion...');
       try {
         await fetch('/api/user/level', {
@@ -773,14 +779,14 @@ const checkGameCompletion = async () => {
         console.error('❌ Error adding XP for completion:', error);
       }
 
-      // 🆕 ذخیره تاریخچه با امتیاز نهایی - بدون retry
+      // 🆕 ذخیره تاریخچه با امتیاز نهایی
       console.log('💾 Saving game to history with final score:', finalTodayScore);
       await saveGameToHistory(
         currentUser.id, 
         currentGameId, 
         dailyPuzzle, 
         mistakes,
-        finalTodayScore // 🎯 همین الان با امتیاز نهایی ذخیره کن
+        finalTodayScore
       );
       console.log('✅ Game history saved with final score:', finalTodayScore);
 
@@ -788,14 +794,13 @@ const checkGameCompletion = async () => {
       console.error('❌ Error in game completion process:', error);
     }
 
-    // بروزرسانی منوی پیشرفت
     console.log('🔄 Refreshing user stats and level...');
     await fetchUserLevel(currentUser.id);
     await fetchUserStats(currentUser.id);
     
     console.log('🎉 Game completion process finished successfully');
   } else {
-    console.log('🔍 Game not completed yet - still', dailyPuzzle.size * dailyPuzzle.size - cellStatus.flat().filter(status => status === 'locked').length, 'cells remaining');
+    console.log('🔍 Game not completed yet');
   }
 };
 
