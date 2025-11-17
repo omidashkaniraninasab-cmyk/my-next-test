@@ -711,14 +711,12 @@ const checkGameCompletion = async () => {
   if (allLocked && !gameCompleted) {
     const bonusScore = 50;
     
-    // 🆕 لاگ دقیق همه stateها قبل از هر کاری
     console.log('🔍 DEBUG - Initial state values:', {
       instantScore,
       score,
       bonusScore,
       currentUser: currentUser?.id,
       gameId: currentGameId,
-      dailyPuzzleSize: dailyPuzzle?.size
     });
 
     console.log('🎯 Game completed! Adding bonus:', bonusScore);
@@ -754,13 +752,11 @@ const checkGameCompletion = async () => {
         if (freshUserData) {
           const finalTodayScore = freshUserData.today_crossword_score;
           
-          // 🆕 لاگ مقایسه‌ای
           console.log('🔍 COMPARISON - Scores comparison:', {
             instantScoreFromState: instantScore,
             scoreFromState: score,
             todayScoreFromDB: finalTodayScore,
             bonusScore: bonusScore,
-            calculatedScore: score + bonusScore
           });
 
           console.log('🎯 Final today score from DB:', finalTodayScore);
@@ -791,60 +787,43 @@ const checkGameCompletion = async () => {
             })
           });
 
-          // 🆕 لاگ نهایی قبل از ذخیره تاریخچه
-          console.log('🔍 FINAL CHECK - Before saving history:', {
-            instantScore,
-            score, 
-            bonusScore,
-            finalTodayScoreFromDB: finalTodayScore,
-            calculatedScore: score + bonusScore,
-            currentUser: currentUser.id,
-            gameId: currentGameId
-          });
-
-          // 5. 🎯 حالا تاریخچه رو با امتیاز واقعی از دیتابیس ذخیره کن
-          console.log('💾 FINAL SAVE - Saving game to history with real score:', finalTodayScore);
+          // 5. 🎯 ذخیره تاریخچه
+          console.log('💾 FINAL SAVE - Saving game to history with score:', finalTodayScore);
           await saveGameToHistory(
             currentUser.id, 
             currentGameId, 
             dailyPuzzle, 
             mistakes,
-            finalTodayScore // 🎯 این امتیاز واقعیه از دیتابیس
+            finalTodayScore
           );
-          console.log('✅ FINAL - Game history saved with real score:', finalTodayScore);
+          console.log('✅ FINAL - History saved with score:', finalTodayScore);
 
-          // 🆕 تأیید نهایی - دوباره از دیتابیس بخون
+          // 🆕 تأیید نهایی
           setTimeout(async () => {
             try {
-              console.log('🔍 VERIFICATION - Reading history from DB to verify...');
-              const historyResponse = await fetch(`/api/users/game-history?userId=${currentUser.id}&limit=1`);
+              console.log('🔍 FINAL VERIFICATION - Checking history...');
+              const historyResponse = await fetch(`/api/users/game-history?userId=${currentUser.id}&limit=5`);
               if (historyResponse.ok) {
                 const historyData = await historyResponse.json();
-                console.log('🔍 VERIFICATION - Latest history item:', historyData.history?.[0]);
+                console.log('🔍 FINAL VERIFICATION - History count:', historyData.history?.length);
+                if (historyData.history && historyData.history.length > 0) {
+                  console.log('🔍 FINAL VERIFICATION - Latest item score:', historyData.history[0].score);
+                }
               }
             } catch (error) {
-              console.error('❌ Verification error:', error);
+              console.error('❌ FINAL VERIFICATION error:', error);
             }
-          }, 1000);
+          }, 3000);
 
-        } else {
-          console.log('❌ User not found in fresh data');
         }
-      } else {
-        console.error('❌ Error fetching users data:', usersResponse.status);
       }
 
     } catch (error) {
       console.error('❌ Error in game completion process:', error);
     }
 
-    console.log('🔄 Refreshing user stats and level...');
     await fetchUserLevel(currentUser.id);
     await fetchUserStats(currentUser.id);
-    
-    console.log('🎉 Game completion process finished successfully');
-  } else {
-    console.log('🔍 Game not completed yet - still', dailyPuzzle.size * dailyPuzzle.size - cellStatus.flat().filter(status => status === 'locked').length, 'cells remaining');
   }
 };
 
