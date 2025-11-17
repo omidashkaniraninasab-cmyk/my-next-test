@@ -710,8 +710,9 @@ const checkGameCompletion = async () => {
 
   if (allLocked && !gameCompleted) {
     const bonusScore = 50;
+    const finalTodayScore = score + bonusScore; // 🎯 امتیاز نهایی
     
-    console.log('🎯 Game completed! Adding bonus:', bonusScore);
+    console.log('🎯 Game completed! Final score:', finalTodayScore);
 
     setGameCompleted(true);
     setTodayGameCompleted(true);
@@ -743,7 +744,7 @@ const checkGameCompletion = async () => {
         },
         body: JSON.stringify({
           gameId: currentGameId,
-          finalScore: score + bonusScore,
+          finalScore: finalTodayScore,
           userId: currentUser.id
         }),
       });
@@ -772,52 +773,16 @@ const checkGameCompletion = async () => {
         console.error('❌ Error adding XP for completion:', error);
       }
 
-      // 🆕 تابع با retry برای ذخیره تاریخچه با امتیاز درست
-      const saveHistoryWithRetry = async (retryCount = 0) => {
-        try {
-          console.log(`🔄 Fetching fresh user data (attempt ${retryCount + 1})...`);
-          
-          const userResponse = await fetch('/api/users');
-          if (userResponse.ok) {
-            const usersData = await userResponse.json();
-            const freshUserData = usersData.find(user => user.id === currentUser.id);
-            
-            if (freshUserData && freshUserData.today_crossword_score > 0) {
-              // امتیاز آپدیت شده
-              await saveGameToHistory(
-                currentUser.id, 
-                currentGameId, 
-                dailyPuzzle, 
-                mistakes,
-                freshUserData.today_crossword_score
-              );
-              console.log('✅ Game history saved with final score:', freshUserData.today_crossword_score);
-              return true;
-            } else if (retryCount < 5) {
-              // هنوز آپدیت نشده، دوباره تلاش کن
-              console.log('⏳ Score not updated yet, retrying...');
-              setTimeout(() => saveHistoryWithRetry(retryCount + 1), 1000);
-            } else {
-              console.log('❌ Max retries reached, saving with calculated score');
-              // اگر بعد از ۵ بار آپدیت نشد، با امتیاز محاسبه‌شده ذخیره کن
-              const calculatedScore = score + 50;
-              await saveGameToHistory(
-                currentUser.id, 
-                currentGameId, 
-                dailyPuzzle, 
-                mistakes,
-                calculatedScore
-              );
-              console.log('✅ Game history saved with calculated score:', calculatedScore);
-            }
-          }
-        } catch (error) {
-          console.error('❌ Error in saveHistoryWithRetry:', error);
-        }
-      };
-
-      // شروع فرآیند ذخیره تاریخچه
-      saveHistoryWithRetry();
+      // 🆕 ذخیره تاریخچه با امتیاز نهایی - بدون retry
+      console.log('💾 Saving game to history with final score:', finalTodayScore);
+      await saveGameToHistory(
+        currentUser.id, 
+        currentGameId, 
+        dailyPuzzle, 
+        mistakes,
+        finalTodayScore // 🎯 همین الان با امتیاز نهایی ذخیره کن
+      );
+      console.log('✅ Game history saved with final score:', finalTodayScore);
 
     } catch (error) {
       console.error('❌ Error in game completion process:', error);
