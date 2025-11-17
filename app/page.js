@@ -787,51 +787,33 @@ const checkGameCompletion = async () => {
             })
           });
 
-          // 🆕 5. ذخیره تاریخچه با خطایابی کامل
+          // 🆕 5. ذخیره تاریخچه با API مستقیم
           console.log('💾 FINAL SAVE - Saving game to history with score:', finalTodayScore);
+          
           try {
-            const saveResult = await saveGameToHistory(
-              currentUser.id, 
-              currentGameId, 
-              dailyPuzzle, 
-              mistakes,
-              finalTodayScore
-            );
-            console.log('✅ FINAL - History saved successfully, ID:', saveResult?.id);
-            console.log('✅ FINAL - Save result:', saveResult);
-          } catch (saveError) {
-            console.error('❌ FINAL - History save FAILED:');
-            console.error('❌ Error message:', saveError.message);
-            console.error('❌ Error stack:', saveError.stack);
-            
-            // 🆕 تست مستقیم INSERT
-            try {
-              console.log('🔧 Trying direct SQL insert...');
-              const directResponse = await fetch('/api/game/save-history', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  userId: currentUser.id,
-                  gameId: currentGameId,
-                  score: finalTodayScore,
-                  mistakes: mistakes,
-                  puzzleTitle: dailyPuzzle.title,
-                  puzzleSize: dailyPuzzle.size
-                }),
-              });
-              
-              if (directResponse.ok) {
-                const directResult = await directResponse.json();
-                console.log('✅ Direct save result:', directResult);
-              } else {
-                const errorText = await directResponse.text();
-                console.error('❌ Direct save failed:', errorText);
-              }
-            } catch (directError) {
-              console.error('❌ Direct save error:', directError);
+            const historyResponse = await fetch('/api/game/save-history', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                userId: currentUser.id,
+                gameId: currentGameId,
+                puzzleData: dailyPuzzle,
+                mistakes: mistakes,
+                todayScore: finalTodayScore
+              }),
+            });
+
+            if (historyResponse.ok) {
+              const historyResult = await historyResponse.json();
+              console.log('✅ API SAVE - History saved via API:', historyResult);
+            } else {
+              const errorText = await historyResponse.text();
+              console.error('❌ API SAVE - Failed:', historyResponse.status, errorText);
             }
+          } catch (apiError) {
+            console.error('❌ API SAVE - Error:', apiError);
           }
 
           // 🆕 تأیید نهایی
