@@ -198,39 +198,20 @@ const loadDailyPuzzle = async () => {
         nextOpenTime: closedData.nextOpenTime
       });
     } else if (response.ok) {
-      // بازی بازه - این یعنی جدول جدید لود شده
+      // بازی بازه - سرور خودش امتیازها رو ریست کرده
       const puzzleData = await response.json();
       setDailyPuzzle(puzzleData);
       
-      console.log('✅ Daily puzzle loaded - NEW DAY STARTED');
+      console.log('✅ Daily puzzle loaded - Server handled score reset');
       
-      // 🆕 **اگر کاربر لاگین کرده، امتیاز امروز رو صفر کن**
+      // فقط اطلاعات کاربر رو رفرش کن
       if (currentUser && currentUser.id !== 'guest') {
-        console.log('🔄 Resetting today score for new day');
-        
-        try {
-          await fetch('/api/users/reset-today-score', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              userId: currentUser.id
-            }),
-          });
-          console.log('✅ Today score reset to 0');
-          
-          // رفرش اطلاعات کاربر
-          await fetchUserStats(currentUser.id);
-        } catch (error) {
-          console.error('❌ Error resetting today score:', error);
-        }
+        await fetchUserStats(currentUser.id);
+        await checkGameStatus(currentUser.id);
       }
-      
     } else {
       throw new Error('Failed to load puzzle');
     }
-    
   } catch (error) {
     console.error('💥 Error loading daily puzzle:', error);
     const puzzleModule = await import('@/lib/dailyPuzzleData');
