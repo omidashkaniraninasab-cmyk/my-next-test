@@ -7,9 +7,6 @@ export async function POST(request) {
   console.log('🔍 SAVE-HISTORY API CALLED - START');
   
   try {
-    // لاگ request کامل
-    console.log('🔍 Request headers:', Object.fromEntries(request.headers));
-    
     const body = await request.json();
     console.log('🔍 Request body received:', JSON.stringify(body, null, 2));
     
@@ -18,13 +15,11 @@ export async function POST(request) {
     console.log('🔍 Parsed parameters:', {
       userId,
       gameId, 
-      todayScore,
+      todayScore, // 🆕 این رو چک کن
       mistakes,
-      hasPuzzleData: !!puzzleData,
-      puzzleDataKeys: puzzleData ? Object.keys(puzzleData) : 'NO_PUZZLE_DATA'
+      hasPuzzleData: !!puzzleData
     });
 
-    // اعتبارسنجی پارامترها
     if (!userId || !gameId) {
       console.log('❌ Missing required fields:', { userId, gameId });
       return Response.json({ 
@@ -35,29 +30,20 @@ export async function POST(request) {
 
     console.log('💾 Starting to save game history...');
     
-    const score = todayScore || 0;
+    const score = todayScore || 0; // 🆕 این درسته
     const completionTime = null;
 
-    console.log('🔍 Calling saveGameToHistory function with:', {
-      userId,
-      gameId,
-      puzzleTitle: puzzleData?.title,
-      puzzleSize: puzzleData?.size,
-      score,
-      mistakes
-    });
+    console.log('🔍 Calling saveGameToHistory function with score:', score);
 
-    // تست connection دیتابیس
-    try {
-      const testConnection = await sql`SELECT 1 as test`;
-      console.log('✅ Database connection test:', testConnection);
-    } catch (dbError) {
-      console.error('❌ Database connection failed:', dbError);
-      throw new Error(`Database connection error: ${dbError.message}`);
-    }
-
-    // ذخیره تاریخچه
-    const result = await saveGameToHistory(userId, gameId, puzzleData, score, mistakes, completionTime);
+    // 🆕 **درستش کن - todayScore رو پاس بده**
+    const result = await saveGameToHistory(
+      userId, 
+      gameId, 
+      puzzleData, 
+      score, // 🎯 این todayScore هست که درست مقداردهی شده
+      mistakes, 
+      completionTime
+    );
     
     console.log('✅ saveGameToHistory result:', result);
 
@@ -69,16 +55,11 @@ export async function POST(request) {
     });
     
   } catch (error) {
-    console.error('❌ SAVE-HISTORY ERROR:');
-    console.error('❌ Error message:', error.message);
-    console.error('❌ Error stack:', error.stack);
-    console.error('❌ Error name:', error.name);
+    console.error('❌ SAVE-HISTORY ERROR:', error.message);
     
     return Response.json({ 
       success: false,
-      error: error.message,
-      errorType: error.name,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: error.message
     }, { status: 500 });
   }
 }

@@ -713,7 +713,6 @@ const checkGameCompletion = async () => {
     
     console.log('🎯 Game completed! Adding bonus:', bonusScore);
 
-    // 🆕 اول stateها رو آپدیت کن تا از اجرای مجدد جلوگیری بشه
     setGameCompleted(true);
     setTodayGameCompleted(true);
     setInstantScore(0);
@@ -721,7 +720,7 @@ const checkGameCompletion = async () => {
     try {
       console.log('💰 Adding bonus to today score...');
       
-      // 🆕 فقط bonus به امتیاز امروز اضافه شود
+      // اضافه کردن bonus به امتیاز امروز
       await fetch('/api/users/update-score', {
         method: 'POST',
         headers: {
@@ -729,13 +728,13 @@ const checkGameCompletion = async () => {
         },
         body: JSON.stringify({
           userId: currentUser.id,
-          additionalScore: bonusScore, // فقط 50 به امروز اضافه کن
+          additionalScore: bonusScore,
           currentInstantScore: 0
         }),
       });
       console.log('✅ Bonus score added to today score');
 
-      // 🆕 تکمیل بازی - اینجا فقط 50 به کل اضافه میشه
+      // تکمیل بازی
       console.log('🏁 Marking game as completed...');
       const completeResponse = await fetch('/api/game/complete', {
         method: 'POST',
@@ -750,13 +749,13 @@ const checkGameCompletion = async () => {
       });
       
       if (completeResponse.ok) {
-        console.log('✅ Game completion recorded - 50 points added to total');
+        console.log('✅ Game completion recorded');
       } else {
         const errorText = await completeResponse.text();
         console.error('❌ Game completion failed:', completeResponse.status, errorText);
       }
 
-      // 🆕 اضافه کردن XP برای بازی کامل
+      // اضافه کردن XP برای بازی کامل
       console.log('⭐ Adding XP for game completion...');
       try {
         await fetch('/api/user/level', {
@@ -773,16 +772,18 @@ const checkGameCompletion = async () => {
         console.error('❌ Error adding XP for completion:', error);
       }
 
-      // 🆕 ذخیره تاریخچه با تاخیر
-      setTimeout(async () => {
+      // 🆕 تابع با retry برای ذخیره تاریخچه با امتیاز درست
+      const saveHistoryWithRetry = async (retryCount = 0) => {
         try {
-          console.log('💾 Saving game to history...');
+          console.log(`🔄 Fetching fresh user data (attempt ${retryCount + 1})...`);
+          
           const userResponse = await fetch('/api/users');
           if (userResponse.ok) {
             const usersData = await userResponse.json();
             const freshUserData = usersData.find(user => user.id === currentUser.id);
             
-            if (freshUserData) {
+            if (freshUserData && freshUserData.today_crossword_score > 0) {
+              // امتیاز آپدیت شده
               await saveGameToHistory(
                 currentUser.id, 
                 currentGameId, 
@@ -790,13 +791,33 @@ const checkGameCompletion = async () => {
                 mistakes,
                 freshUserData.today_crossword_score
               );
-              console.log('✅ Game history saved');
+              console.log('✅ Game history saved with final score:', freshUserData.today_crossword_score);
+              return true;
+            } else if (retryCount < 5) {
+              // هنوز آپدیت نشده، دوباره تلاش کن
+              console.log('⏳ Score not updated yet, retrying...');
+              setTimeout(() => saveHistoryWithRetry(retryCount + 1), 1000);
+            } else {
+              console.log('❌ Max retries reached, saving with calculated score');
+              // اگر بعد از ۵ بار آپدیت نشد، با امتیاز محاسبه‌شده ذخیره کن
+              const calculatedScore = score + 50;
+              await saveGameToHistory(
+                currentUser.id, 
+                currentGameId, 
+                dailyPuzzle, 
+                mistakes,
+                calculatedScore
+              );
+              console.log('✅ Game history saved with calculated score:', calculatedScore);
             }
           }
         } catch (error) {
-          console.error('❌ Error saving game history:', error);
+          console.error('❌ Error in saveHistoryWithRetry:', error);
         }
-      }, 1000);
+      };
+
+      // شروع فرآیند ذخیره تاریخچه
+      saveHistoryWithRetry();
 
     } catch (error) {
       console.error('❌ Error in game completion process:', error);
