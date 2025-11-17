@@ -198,18 +198,33 @@ const loadDailyPuzzle = async () => {
         nextOpenTime: closedData.nextOpenTime
       });
     } else if (response.ok) {
-      // بازی بازه
+      // بازی بازه - این یعنی جدول جدید لود شده
       const puzzleData = await response.json();
       setDailyPuzzle(puzzleData);
       
-      console.log('✅ Daily puzzle loaded');
+      console.log('✅ Daily puzzle loaded - NEW DAY STARTED');
       
-      // 🆕 **رفرش وضعیت کاربر فقط اگر لازم باشد - با تاخیر**
+      // 🆕 **اگر کاربر لاگین کرده، امتیاز امروز رو صفر کن**
       if (currentUser && currentUser.id !== 'guest') {
-        setTimeout(async () => {
-          await checkGameStatus(currentUser.id);
+        console.log('🔄 Resetting today score for new day');
+        
+        try {
+          await fetch('/api/users/reset-today-score', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userId: currentUser.id
+            }),
+          });
+          console.log('✅ Today score reset to 0');
+          
+          // رفرش اطلاعات کاربر
           await fetchUserStats(currentUser.id);
-        }, 500);
+        } catch (error) {
+          console.error('❌ Error resetting today score:', error);
+        }
       }
       
     } else {
