@@ -711,17 +711,7 @@ const checkGameCompletion = async () => {
   if (allLocked && !gameCompleted) {
     const bonusScore = 50;
     
-    // 🆕 محاسبه امتیاز نهایی - از هر دو state استفاده کن
-    const gameScore = Math.max(instantScore, score); // بزرگترین مقدار رو بگیر
-    const finalTodayScore = gameScore + bonusScore;
-    
-    console.log('🎯 Game completed! Scores:', {
-      instantScore,
-      score,
-      gameScore,
-      bonusScore,
-      finalTodayScore
-    });
+    console.log('🎯 Game completed! Adding bonus:', bonusScore);
 
     setGameCompleted(true);
     setTodayGameCompleted(true);
@@ -730,6 +720,7 @@ const checkGameCompletion = async () => {
     try {
       console.log('💰 Adding bonus to today score...');
       
+      // 1. اول bonus رو اضافه کن
       await fetch('/api/users/update-score', {
         method: 'POST',
         headers: {
@@ -743,64 +734,63 @@ const checkGameCompletion = async () => {
       });
       console.log('✅ Bonus score added to today score');
 
-      console.log('🏁 Marking game as completed...');
-      const completeResponse = await fetch('/api/game/complete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          gameId: currentGameId,
-          finalScore: finalTodayScore,
-          userId: currentUser.id
-        }),
-      });
-      
-      if (completeResponse.ok) {
-        console.log('✅ Game completion recorded');
-      } else {
-        const errorText = await completeResponse.text();
-        console.error('❌ Game completion failed:', completeResponse.status, errorText);
-      }
+      // 2. سپس از دیتابیس امتیاز آپدیت شده رو بخون
+      console.log('📊 Fetching updated score from database...');
+      const usersResponse = await fetch('/api/users');
+      if (usersResponse.ok) {
+        const usersData = await usersResponse.json();
+        const freshUserData = usersData.find(user => user.id === currentUser.id);
+        
+        if (freshUserData) {
+          const finalTodayScore = freshUserData.today_crossword_score;
+          
+          console.log('🎯 Final today score from DB:', finalTodayScore);
 
-      console.log('⭐ Adding XP for game completion...');
-      try {
-        await fetch('/api/user/level', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: currentUser.id,
-            xp: 100,
-            reason: 'اتمام بازی کراسورد'
-          })
-        });
-        console.log('✅ XP added for game completion');
-      } catch (error) {
-        console.error('❌ Error adding XP for completion:', error);
-      }
+          // 3. تکمیل بازی
+          console.log('🏁 Marking game as completed...');
+          await fetch('/api/game/complete', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              gameId: currentGameId,
+              finalScore: finalTodayScore,
+              userId: currentUser.id
+            }),
+          });
 
-      // 🆕 ذخیره تاریخچه با امتیاز نهایی
-      console.log('💾 Saving game to history with final score:', finalTodayScore);
-      await saveGameToHistory(
-        currentUser.id, 
-        currentGameId, 
-        dailyPuzzle, 
-        mistakes,
-        finalTodayScore
-      );
-      console.log('✅ Game history saved with final score:', finalTodayScore);
+          // 4. XP
+          console.log('⭐ Adding XP for game completion...');
+          await fetch('/api/user/level', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: currentUser.id,
+              xp: 100,
+              reason: 'اتمام بازی کراسورد'
+            })
+          });
+
+          // 5. 🎯 حالا تاریخچه رو با امتیاز واقعی از دیتابیس ذخیره کن
+          console.log('💾 Saving game to history with real score:', finalTodayScore);
+          await saveGameToHistory(
+            currentUser.id, 
+            currentGameId, 
+            dailyPuzzle, 
+            mistakes,
+            finalTodayScore // 🎯 این امتیاز واقعیه از دیتابیس
+          );
+          console.log('✅ Game history saved with real score:', finalTodayScore);
+        }
+      }
 
     } catch (error) {
       console.error('❌ Error in game completion process:', error);
     }
 
-    console.log('🔄 Refreshing user stats and level...');
     await fetchUserLevel(currentUser.id);
     await fetchUserStats(currentUser.id);
-    
-    console.log('🎉 Game completion process finished successfully');
-  } else {
-    console.log('🔍 Game not completed yet');
   }
 };
 
