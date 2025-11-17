@@ -27,9 +27,10 @@ export async function POST(request) {
     console.log('💾 Starting DIRECT database insert...');
     
     const score = todayScore || 0;
-
+// در endpoint تاریخچه - این رو جایگزین کن
+const now = new Date().toISOString(); // زمان از JavaScript
     // 🆕 INSERT مستقیم به دیتابیس
-    const result = await sql`
+   const result = await sql`
   INSERT INTO game_history (
     user_id, 
     game_id, 
@@ -48,7 +49,7 @@ export async function POST(request) {
     ${score}, 
     ${mistakes}, 
     ${null},
-    NOW() AT TIME ZONE 'Asia/Tehran'  -- 🎯 این خط رو عوض کن
+    ${now}  -- 🎯 زمان از JavaScript
   )
   RETURNING id, score, created_at
 `;
