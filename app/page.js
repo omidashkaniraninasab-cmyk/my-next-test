@@ -787,16 +787,52 @@ const checkGameCompletion = async () => {
             })
           });
 
-          // 5. 🎯 ذخیره تاریخچه
+          // 🆕 5. ذخیره تاریخچه با خطایابی کامل
           console.log('💾 FINAL SAVE - Saving game to history with score:', finalTodayScore);
-          await saveGameToHistory(
-            currentUser.id, 
-            currentGameId, 
-            dailyPuzzle, 
-            mistakes,
-            finalTodayScore
-          );
-          console.log('✅ FINAL - History saved with score:', finalTodayScore);
+          try {
+            const saveResult = await saveGameToHistory(
+              currentUser.id, 
+              currentGameId, 
+              dailyPuzzle, 
+              mistakes,
+              finalTodayScore
+            );
+            console.log('✅ FINAL - History saved successfully, ID:', saveResult?.id);
+            console.log('✅ FINAL - Save result:', saveResult);
+          } catch (saveError) {
+            console.error('❌ FINAL - History save FAILED:');
+            console.error('❌ Error message:', saveError.message);
+            console.error('❌ Error stack:', saveError.stack);
+            
+            // 🆕 تست مستقیم INSERT
+            try {
+              console.log('🔧 Trying direct SQL insert...');
+              const directResponse = await fetch('/api/game/save-history', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  userId: currentUser.id,
+                  gameId: currentGameId,
+                  score: finalTodayScore,
+                  mistakes: mistakes,
+                  puzzleTitle: dailyPuzzle.title,
+                  puzzleSize: dailyPuzzle.size
+                }),
+              });
+              
+              if (directResponse.ok) {
+                const directResult = await directResponse.json();
+                console.log('✅ Direct save result:', directResult);
+              } else {
+                const errorText = await directResponse.text();
+                console.error('❌ Direct save failed:', errorText);
+              }
+            } catch (directError) {
+              console.error('❌ Direct save error:', directError);
+            }
+          }
 
           // 🆕 تأیید نهایی
           setTimeout(async () => {
@@ -807,7 +843,10 @@ const checkGameCompletion = async () => {
                 const historyData = await historyResponse.json();
                 console.log('🔍 FINAL VERIFICATION - History count:', historyData.history?.length);
                 if (historyData.history && historyData.history.length > 0) {
-                  console.log('🔍 FINAL VERIFICATION - Latest item score:', historyData.history[0].score);
+                  console.log('🔍 FINAL VERIFICATION - Latest 3 items:');
+                  historyData.history.slice(0, 3).forEach((item, index) => {
+                    console.log(`   ${index + 1}. ID: ${item.id}, Score: ${item.score}, Date: ${item.created_at}`);
+                  });
                 }
               }
             } catch (error) {
