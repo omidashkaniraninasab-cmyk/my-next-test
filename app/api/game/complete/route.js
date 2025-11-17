@@ -9,7 +9,7 @@ export async function POST(request) {
     
     console.log('🎯 Marking game as completed for user:', userId);
 
-    // 🆕 اول چک کن ببین بازی قبلاً کامل شده یا نه
+    // اول چک کن ببین بازی قبلاً کامل شده یا نه
     const existingGame = await sql`
       SELECT completed FROM crossword_games WHERE id = ${gameId}
     `;
@@ -35,12 +35,10 @@ export async function POST(request) {
     console.log('✅ Completed games count incremented');
 
     // ✅ آپدیت وضعیت کاربر - فقط today_game_completed رو TRUE کن
-    // 🆕 امتیاز اضافه نکن چون قبلاً در update-score اضافه شده
+    // 🆕 کاما اضافی رو حذف کن
     await sql`
       UPDATE user_profiles 
-      SET 
-        today_game_completed = TRUE
-        // 🆕 total_crossword_score رو حذف کردیم
+      SET today_game_completed = TRUE
       WHERE id = ${userId}
     `;
 
