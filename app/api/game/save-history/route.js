@@ -30,28 +30,28 @@ export async function POST(request) {
 
     // 🆕 INSERT مستقیم به دیتابیس
     const result = await sql`
-      INSERT INTO game_history (
-        user_id, 
-        game_id, 
-        puzzle_title, 
-        puzzle_size, 
-        score, 
-        mistakes, 
-        completion_time,
-        created_at
-      ) 
-      VALUES (
-        ${userId}, 
-        ${gameId}, 
-        ${puzzleData?.title || 'جدول روزانه'}, 
-        ${puzzleData?.size || 6}, 
-        ${score}, 
-        ${mistakes}, 
-        ${null},
-        CURRENT_TIMESTAMP  -- 🎯 این تاریخ امروز رو می‌گیره
-      )
-      RETURNING id, score, created_at
-    `;
+  INSERT INTO game_history (
+    user_id, 
+    game_id, 
+    puzzle_title, 
+    puzzle_size, 
+    score, 
+    mistakes, 
+    completion_time,
+    created_at
+  ) 
+  VALUES (
+    ${userId}, 
+    ${gameId}, 
+    ${puzzleData?.title || 'جدول روزانه'}, 
+    ${puzzleData?.size || 6}, 
+    ${score}, 
+    ${mistakes}, 
+    ${null},
+    NOW() AT TIME ZONE 'Asia/Tehran'  -- 🎯 این خط رو عوض کن
+  )
+  RETURNING id, score, created_at
+`;
 
     console.log('✅ DIRECT INSERT - Result:', result[0]);
 
