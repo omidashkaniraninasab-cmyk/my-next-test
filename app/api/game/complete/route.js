@@ -24,16 +24,16 @@ export async function POST(request) {
     await incrementCompletedGames(userId);
     console.log('✅ Completed games count incremented');
 
-    // ✅ آپدیت وضعیت کاربر - بازی امروز تکمیل شد
+    // ✅ آپدیت وضعیت کاربر - فقط 50 امتیاز پاداش به کل اضافه کن
     await sql`
       UPDATE user_profiles 
       SET 
         today_game_completed = TRUE,
-        total_crossword_score = COALESCE(total_crossword_score, 0) + ${finalScore}
+        total_crossword_score = COALESCE(total_crossword_score, 0) + 50  -- 🆕 فقط 50 امتیاز پاداش
       WHERE id = ${userId}
     `;
 
-    console.log('✅ Final score added to total score:', finalScore);
+    console.log('✅ Only 50 bonus points added to total score');
 
     return Response.json({ 
       success: true,
