@@ -983,6 +983,119 @@ const calculateDailyPerformance = () => {
   };
 };
 
+// این رو قبل از return اصلی اضافه کن - مثلاً بعد از توابع دیگر
+const renderCrosswordGrid = () => {
+  if (!dailyPuzzle) return null;
+  
+  const size = dailyPuzzle.size;
+  
+  const toPersianNumber = (number) => {
+    const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+    return number.toString().replace(/\d/g, (digit) => persianDigits[parseInt(digit)]);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginBottom: '20px' }}>
+      {/* شماره‌های ستون‌ها (بالا) - از راست به چپ */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: `repeat(${size}, 60px) 40px`,
+        gap: '2px',
+        marginBottom: '5px',
+        marginRight: '40px'
+      }}>
+        {Array.from({ length: size }, (_, colIndex) => (
+          <div
+            key={`col-${colIndex}`}
+            style={{
+              width: '60px',
+              height: '30px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '18px',
+              fontFamily: 'Vazir, Tahoma, sans-serif',
+              fontWeight: 'bold',
+              color: '#666'
+            }}
+          >
+            {toPersianNumber(size - colIndex)}
+          </div>
+        ))}
+        <div></div> {/* خانه خالی برای گوشه */}
+      </div>
+
+      {/* جدول و شماره‌های سطرها */}
+      <div style={{ display: 'flex' }}>
+        {/* خود جدول */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: `repeat(${size}, 60px)`,
+          gap: '2px'
+        }}>
+          {dailyPuzzle.grid.map((row, rowIndex) => (
+            row.map((cell, colIndex) => (
+              <div
+                key={`${rowIndex}-${colIndex}`}
+                onClick={() => currentUser && handleCellSelect(rowIndex, colIndex)}
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  backgroundColor: cell === 0 ? '#333' : 
+                    selectedCell[0] === rowIndex && selectedCell[1] === colIndex ? '#0070f3' :
+                    cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '#2E7D32' :
+                    cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct' ? '#4CAF50' :
+                    cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'wrong' ? '#f44336' : '#fff',
+                  border: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '2px solid #1B5E20' : '2px solid #ccc',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '20px',
+                  fontWeight: 'bold',
+                  cursor: currentUser && cell === 1 && cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] !== 'locked' && !gameCompleted ? 'pointer' : 'default',
+                  color: (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked') || (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct') ? '#fff' : '#000',
+                  transition: 'all 0.2s',
+                  opacity: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? 0.8 : 1
+                }}
+              >
+                {userInput[rowIndex] && userInput[rowIndex][colIndex] !== undefined ? userInput[rowIndex][colIndex] : ''}
+                {cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' && ' 🔒'}
+              </div>
+            ))
+          ))}
+        </div>
+
+        {/* شماره‌های سطرها (سمت راست) */}
+        <div style={{ 
+          display: 'grid',
+          gridTemplateRows: `repeat(${size}, 60px)`,
+          gap: '2px',
+          marginLeft: '5px'
+        }}>
+          {Array.from({ length: size }, (_, rowIndex) => (
+            <div
+              key={`row-${rowIndex}`}
+              style={{
+                width: '40px',
+                height: '60px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                fontFamily: 'Vazir, Tahoma, sans-serif',
+                fontWeight: 'bold',
+                color: '#666'
+              }}
+            >
+              {toPersianNumber(rowIndex + 1)}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // تابع برای عنوان عملکرد
 // تابع برای عنوان عملکرد - براساس دقت
 const getPerformanceTitle = (accuracy) => {
@@ -1533,43 +1646,7 @@ const getMotivationalMessage = (accuracy) => {
          !gameCompleted && (
           <div style={{ marginBottom: '40px' }}>
             {/* محتوای جدول و صفحه کلید */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: `repeat(${dailyPuzzle ? dailyPuzzle.size : 6}, 60px)`,
-              gap: '2px',
-              marginBottom: '20px'
-            }}>
-              {dailyPuzzle && dailyPuzzle.grid.map((row, rowIndex) => (
-                row.map((cell, colIndex) => (
-                  <div
-                    key={`${rowIndex}-${colIndex}`}
-                    onClick={() => currentUser && handleCellSelect(rowIndex, colIndex)}
-                    style={{
-                      width: '60px',
-                      height: '60px',
-                      backgroundColor: cell === 0 ? '#333' : 
-                        selectedCell[0] === rowIndex && selectedCell[1] === colIndex ? '#0070f3' :
-                        cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '#2E7D32' :
-                        cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct' ? '#4CAF50' :
-                        cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'wrong' ? '#f44336' : '#fff',
-                      border: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '2px solid #1B5E20' : '2px solid #ccc',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '20px',
-                      fontWeight: 'bold',
-                      cursor: currentUser && cell === 1 && cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] !== 'locked' && !gameCompleted ? 'pointer' : 'default',
-                      color: (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked') || (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct') ? '#fff' : '#000',
-                      transition: 'all 0.2s',
-                      opacity: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? 0.8 : 1
-                    }}
-                  >
-                    {userInput[rowIndex] && userInput[rowIndex][colIndex] !== undefined ? userInput[rowIndex][colIndex] : ''}
-                    {cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' && ' 🔒'}
-                  </div>
-                ))
-              ))}
-            </div>
+           {renderCrosswordGrid()}
 
             {/* راهنما */}
             {dailyPuzzle && (
