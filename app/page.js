@@ -186,34 +186,31 @@ const loadDailyPuzzle = async () => {
     setPuzzleLoading(true);
     console.log('🎯 Loading daily puzzle...');
     
-    const response = await fetch('/api/daily-puzzle');
+    // اول از monthly-puzzles سعی کن
+    const monthlyResponse = await fetch('/api/monthly-puzzles');
     
-    if (response.status === 423) {
-      // بازی قفله
-      const closedData = await response.json();
-      setDailyPuzzle({
-        closed: true,
-        title: closedData.message,
-        description: closedData.description,
-        nextOpenTime: closedData.nextOpenTime
-      });
-    } else if (response.ok) {
-      // بازی بازه - سرور خودش امتیازها رو ریست کرده
-      const puzzleData = await response.json();
-      setDailyPuzzle(puzzleData);
+    if (monthlyResponse.ok) {
+      const monthlyData = await monthlyResponse.json();
+      console.log('✅ Monthly puzzle loaded:', monthlyData.date);
+      setDailyPuzzle(monthlyData.puzzle_data);
+    } else if (monthlyResponse.status === 404) {
+      // اگر پیدا نکرد، از سیستم قدیمی استفاده کن
+      console.log('📅 No monthly puzzle, using legacy system...');
+      const legacyResponse = await fetch('/api/daily-puzzle');
       
-      console.log('✅ Daily puzzle loaded - Server handled score reset');
-      
-      // فقط اطلاعات کاربر رو رفرش کن
-      if (currentUser && currentUser.id !== 'guest') {
-        await fetchUserStats(currentUser.id);
-        await checkGameStatus(currentUser.id);
+      if (legacyResponse.ok) {
+        const legacyData = await legacyResponse.json();
+        setDailyPuzzle(legacyData);
+      } else {
+        throw new Error('Failed to load puzzle');
       }
     } else {
-      throw new Error('Failed to load puzzle');
+      throw new Error('Monthly puzzles API error');
     }
+    
   } catch (error) {
-    console.error('💥 Error loading daily puzzle:', error);
+    console.error('💥 Error loading puzzle:', error);
+    // Fallback به داده‌های محلی
     const puzzleModule = await import('@/lib/dailyPuzzleData');
     setDailyPuzzle(puzzleModule.dailyPuzzleData);
   } finally {
