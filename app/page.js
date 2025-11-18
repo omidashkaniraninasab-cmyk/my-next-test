@@ -992,15 +992,16 @@ const renderCrosswordGrid = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginBottom: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginBottom: '20px' }}>
       {/* شماره‌های ستون‌ها (بالا) - از راست به چپ */}
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: `repeat(${size}, 60px) 40px`,
+        gridTemplateColumns: `40px repeat(${size}, 60px)`, // 🆕 تغییر: ابتدا خانه اعداد سطرها
         gap: '2px',
         marginBottom: '5px',
-        marginRight: '40px'
+        direction: 'rtl'
       }}>
+        <div></div> {/* خانه خالی برای همترازی */}
         {Array.from({ length: size }, (_, colIndex) => (
           <div
             key={`col-${colIndex}`}
@@ -1013,22 +1014,51 @@ const renderCrosswordGrid = () => {
               fontSize: '18px',
               fontFamily: 'Vazir, Tahoma, sans-serif',
               fontWeight: 'bold',
-              color: '#666'
+              color: '#666',
+              direction: 'rtl'
             }}
           >
-            {toPersianNumber(size - colIndex)}
+            {toPersianNumber(colIndex + 1)}
           </div>
         ))}
-        <div></div> {/* خانه خالی برای گوشه */}
       </div>
 
       {/* جدول و شماره‌های سطرها */}
-      <div style={{ display: 'flex' }}>
+      <div style={{ display: 'flex', direction: 'rtl' }}>
+        {/* شماره‌های سطرها (سمت راست) */}
+        <div style={{ 
+          display: 'grid',
+          gridTemplateRows: `repeat(${size}, 60px)`,
+          gap: '2px',
+          marginLeft: '5px' // 🆕 تغییر: فاصله از سمت چپ
+        }}>
+          {Array.from({ length: size }, (_, rowIndex) => (
+            <div
+              key={`row-${rowIndex}`}
+              style={{
+                width: '40px',
+                height: '60px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                fontFamily: 'Vazir, Tahoma, sans-serif',
+                fontWeight: 'bold',
+                color: '#666',
+                direction: 'rtl'
+              }}
+            >
+              {toPersianNumber(rowIndex + 1)}
+            </div>
+          ))}
+        </div>
+
         {/* خود جدول */}
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: `repeat(${size}, 60px)`,
-          gap: '2px'
+          gap: '2px',
+          direction: 'rtl'
         }}>
           {dailyPuzzle.grid.map((row, rowIndex) => (
             row.map((cell, colIndex) => (
@@ -1052,40 +1082,16 @@ const renderCrosswordGrid = () => {
                   cursor: currentUser && cell === 1 && cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] !== 'locked' && !gameCompleted ? 'pointer' : 'default',
                   color: (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked') || (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct') ? '#fff' : '#000',
                   transition: 'all 0.2s',
-                  opacity: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? 0.8 : 1
+                  opacity: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? 0.8 : 1,
+                  direction: 'rtl',
+                  textAlign: 'right',
+                  fontFamily: 'Vazir, Tahoma, sans-serif'
                 }}
               >
                 {userInput[rowIndex] && userInput[rowIndex][colIndex] !== undefined ? userInput[rowIndex][colIndex] : ''}
                 {cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' && ' 🔒'}
               </div>
             ))
-          ))}
-        </div>
-
-        {/* شماره‌های سطرها (سمت راست) */}
-        <div style={{ 
-          display: 'grid',
-          gridTemplateRows: `repeat(${size}, 60px)`,
-          gap: '2px',
-          marginLeft: '5px'
-        }}>
-          {Array.from({ length: size }, (_, rowIndex) => (
-            <div
-              key={`row-${rowIndex}`}
-              style={{
-                width: '40px',
-                height: '60px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '18px',
-                fontFamily: 'Vazir, Tahoma, sans-serif',
-                fontWeight: 'bold',
-                color: '#666'
-              }}
-            >
-              {toPersianNumber(rowIndex + 1)}
-            </div>
           ))}
         </div>
       </div>
