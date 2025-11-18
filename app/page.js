@@ -1431,140 +1431,7 @@ const getMotivationalMessage = (accuracy) => {
         </div>
       )}
 
-      {/* منوی اختصاصی: کارنامه روزانه */}
-      {currentUser && (
-        <div style={{ 
-          marginBottom: '40px', 
-          padding: '25px', 
-          background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-          borderRadius: '15px',
-          boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-          color: 'white',
-          border: '2px solid #8b5cf6'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: '20px'
-          }}>
-            <div>
-              <h2 style={{ margin: '0 0 10px 0', fontSize: '24px', color: 'white' }}>
-                📊 کارنامه روزانه
-              </h2>
-              <p style={{ margin: 0, opacity: 0.9, fontSize: '14px', color: 'white' }}>
-                عملکرد امروز شما در بازی کراسورد
-              </p>
-            </div>
-          </div>
-
-          {/* کارت‌های اطلاعات - آمار دقیق */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '15px'
-          }}>
-            {/* کارت دقت */}
-            <div style={{
-              backgroundColor: 'rgba(255,255,255,0.15)',
-              padding: '15px',
-              borderRadius: '10px',
-              textAlign: 'center',
-              border: '1px solid rgba(255,255,255,0.3)',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
-                ✅ دقت پاسخ‌ها
-              </div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
-                {dailyPerformance.accuracy}%
-              </div>
-              <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
-                {dailyPerformance.correctCells} از {dailyPerformance.totalCells} خانه
-              </div>
-            </div>
-
-            {/* کارت خطا */}
-            <div style={{
-              backgroundColor: 'rgba(255,255,255,0.15)',
-              padding: '15px',
-              borderRadius: '10px',
-              textAlign: 'center',
-              border: '1px solid rgba(255,255,255,0.3)',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
-                ❌ خانه‌های اشتباه
-              </div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
-                {dailyPerformance.uniqueWrongCells}
-              </div>
-              <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
-                از {dailyPerformance.totalCells} خانه
-              </div>
-            </div>
-
-            {/* کارت اشتباهات کل */}
-            <div style={{
-              backgroundColor: 'rgba(255,255,255,0.15)',
-              padding: '15px',
-              borderRadius: '10px',
-              textAlign: 'center',
-              border: '1px solid rgba(255,255,255,0.3)',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
-                🔄 کل اشتباهات
-              </div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
-                {dailyPerformance.totalMistakes}
-              </div>
-              <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
-                تعداد دفعات اشتباه
-              </div>
-            </div>
-
-            {/* کارت جایگاه */}
-            <div style={{
-              backgroundColor: 'rgba(255,255,255,0.15)',
-              padding: '15px',
-              borderRadius: '10px',
-              textAlign: 'center',
-              border: '1px solid rgba(255,255,255,0.3)',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
-                🏆 جایگاه
-              </div>
-              <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
-                {getPerformanceTitle(dailyPerformance.accuracy)}
-              </div>
-              <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
-                {getPerformanceDescription(dailyPerformance.accuracy)}
-              </div>
-            </div>
-          </div>
-
-          {/* پیام انگیزشی */}
-          <div style={{
-            marginTop: '20px',
-            padding: '15px',
-            backgroundColor: 'rgba(255,255,255,0.15)',
-            borderRadius: '10px',
-            textAlign: 'center',
-            fontSize: '14px',
-            border: '1px solid rgba(255,255,255,0.3)',
-            color: 'white'
-          }}>
-            {getMotivationalMessage(dailyPerformance.accuracy)}
-          </div>
-        </div>
-      )}
-
-      {/* نمودارهای پیشرفت */}
-      <ProgressChart users={users} currentUser={currentUser} />
-
-      {/* اطلاعات جدول روزانه */}
+ {/* اطلاعات جدول روزانه */}
       {dailyPuzzle && (
         <div style={{ 
           marginBottom: '20px', 
@@ -1762,6 +1629,141 @@ const getMotivationalMessage = (accuracy) => {
           </div>
         )}
       </div>
+
+
+      {/* منوی اختصاصی: کارنامه روزانه */}
+      {currentUser && (
+        <div style={{ 
+          marginBottom: '40px', 
+          padding: '25px', 
+          background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+          borderRadius: '15px',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+          color: 'white',
+          border: '2px solid #8b5cf6'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '20px'
+          }}>
+            <div>
+              <h2 style={{ margin: '0 0 10px 0', fontSize: '24px', color: 'white' }}>
+                📊 کارنامه روزانه
+              </h2>
+              <p style={{ margin: 0, opacity: 0.9, fontSize: '14px', color: 'white' }}>
+                عملکرد امروز شما در بازی کراسورد
+              </p>
+            </div>
+          </div>
+
+          {/* کارت‌های اطلاعات - آمار دقیق */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '15px'
+          }}>
+            {/* کارت دقت */}
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              padding: '15px',
+              borderRadius: '10px',
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
+                ✅ دقت پاسخ‌ها
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
+                {dailyPerformance.accuracy}%
+              </div>
+              <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
+                {dailyPerformance.correctCells} از {dailyPerformance.totalCells} خانه
+              </div>
+            </div>
+
+            {/* کارت خطا */}
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              padding: '15px',
+              borderRadius: '10px',
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
+                ❌ خانه‌های اشتباه
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
+                {dailyPerformance.uniqueWrongCells}
+              </div>
+              <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
+                از {dailyPerformance.totalCells} خانه
+              </div>
+            </div>
+
+            {/* کارت اشتباهات کل */}
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              padding: '15px',
+              borderRadius: '10px',
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
+                🔄 کل اشتباهات
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
+                {dailyPerformance.totalMistakes}
+              </div>
+              <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
+                تعداد دفعات اشتباه
+              </div>
+            </div>
+
+            {/* کارت جایگاه */}
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              padding: '15px',
+              borderRadius: '10px',
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', color: 'white' }}>
+                🏆 جایگاه
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
+                {getPerformanceTitle(dailyPerformance.accuracy)}
+              </div>
+              <div style={{ fontSize: '12px', opacity: 0.8, color: 'white' }}>
+                {getPerformanceDescription(dailyPerformance.accuracy)}
+              </div>
+            </div>
+          </div>
+
+          {/* پیام انگیزشی */}
+          <div style={{
+            marginTop: '20px',
+            padding: '15px',
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            borderRadius: '10px',
+            textAlign: 'center',
+            fontSize: '14px',
+            border: '1px solid rgba(255,255,255,0.3)',
+            color: 'white'
+          }}>
+            {getMotivationalMessage(dailyPerformance.accuracy)}
+          </div>
+        </div>
+      )}
+
+      {/* نمودارهای پیشرفت */}
+      <ProgressChart users={users} currentUser={currentUser} />
+     
 
       {/* لیست کاربران */}
       <div>
