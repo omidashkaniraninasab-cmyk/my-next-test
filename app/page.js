@@ -1064,7 +1064,7 @@ const getMotivationalMessage = (accuracy) => {
                     {currentUser.id === 'guest' ? '🎮 شما مهمان هستید' : `👋 سلام ${currentUser.first_name}!`}
                   </div>
                   <div style={{ fontSize: '12px', opacity: '0.9' }}>
-                    🎯 امتیاز: {currentUser.total_crossword_score || 0}
+                    🎯 امتیاز کل : {currentUser.total_crossword_score || 0}
                   </div>
                 </div>
                 <button 
@@ -1426,14 +1426,7 @@ const getMotivationalMessage = (accuracy) => {
               <p><strong>خروج امروز:</strong> {currentUser.today_logout_time ? new Date(currentUser.today_logout_time).toLocaleString('fa-IR') : 'ثبت نشده'}</p>
             </div>
            
-            {currentUser && (
-              <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-                <GameHistory 
-                  userId={currentUser.id} 
-                  key={currentUser.id + Date.now()}
-                />
-              </div>
-            )}
+           
           </div>
         </div>
       )}
@@ -1835,6 +1828,14 @@ const getMotivationalMessage = (accuracy) => {
           </div>
         )}
       </div>
+       {currentUser && (
+              <div style={{ padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+                <GameHistory 
+                  userId={currentUser.id} 
+                  key={currentUser.id + Date.now()}
+                />
+              </div>
+            )}
     </div>
   );
 }
