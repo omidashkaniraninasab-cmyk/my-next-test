@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { getSessionFromCookie, logout } from '@/lib/client-auth';
 import ProgressChart from '../components/ProgressChart';
 import GameHistory from '../components/GameHistory';
+import DailyChallenge from '@/components/games/DailyChallenge';
 
 const LEVEL_SYSTEM = {
   1: { xpRequired: 0, title: "تازه‌کار" },
@@ -1844,6 +1845,10 @@ const getMotivationalMessage = (accuracy) => {
       {/* نمودارهای پیشرفت */}
       <ProgressChart users={users} currentUser={currentUser} />
      
+     {/* چالش سریع روزانه - کاملاً مستقل */}
+<div className="mb-8">
+  <DailyChallenge currentUser={currentUser} />
+</div>
 
       {/* لیست کاربران */}
       <div>
