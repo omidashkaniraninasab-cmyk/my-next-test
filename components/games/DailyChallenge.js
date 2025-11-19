@@ -111,16 +111,16 @@ const DailyChallenge = ({ currentUser }) => {
                     />
                     <br />
                     <button 
-                      onClick={submitAnswer}
-                      disabled={loading}
-                      className={`px-8 py-3 rounded-lg font-bold text-lg transition-all duration-300 shadow-md hover:shadow-lg ${
-                        loading 
-                          ? 'bg-gray-400 cursor-not-allowed' 
-                          : 'bg-green-500 hover:bg-green-600 text-white'
-                      }`}
-                    >
-                      {loading ? '⏳ در حال ثبت...' : '🚀 ارسال پاسخ'}
-                    </button>
+  onClick={(e) => submitAnswer(e)} // e رو پاس بده
+  disabled={loading}
+  className={`px-8 py-3 rounded-lg font-bold text-lg transition-all duration-300 shadow-md hover:shadow-lg ${
+    loading 
+      ? 'bg-gray-400 cursor-not-allowed' 
+      : 'bg-green-500 hover:bg-green-600 text-white'
+  }`}
+>
+  {loading ? '⏳ در حال ثبت...' : '🚀 ارسال پاسخ'}
+</button>
                   </div>
                 )}
 
