@@ -994,26 +994,36 @@ const renderCrosswordGrid = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginBottom: '20px' }}>
-      {/* شماره‌های ستون‌ها (بالا) - از راست به چپ */}
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center',
+      marginBottom: '20px',
+      width: '100%',
+      padding: '0 10px', // اضافه کردن padding برای فاصله از کناره‌ها
+      boxSizing: 'border-box'
+    }}>
+      {/* شماره‌های ستون‌ها */}
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: `40px repeat(${size}, 60px)`, // 🆕 تغییر: ابتدا خانه اعداد سطرها
+        gridTemplateColumns: `30px repeat(${size}, minmax(35px, 1fr))`, // کاهش سایز برای موبایل
         gap: '2px',
         marginBottom: '5px',
-        direction: 'rtl'
+        direction: 'rtl',
+        width: '100%',
+        maxWidth: '400px' // کاهش حداکثر عرض
       }}>
-        <div></div> {/* خانه خالی برای همترازی */}
+        <div></div>
         {Array.from({ length: size }, (_, colIndex) => (
           <div
             key={`col-${colIndex}`}
             style={{
-              width: '60px',
-              height: '30px',
+              minWidth: '30px',
+              height: '25px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '18px',
+              fontSize: '12px', // کاهش بیشتر فونت
               fontFamily: 'Vazir, Tahoma, sans-serif',
               fontWeight: 'bold',
               color: '#666',
@@ -1026,24 +1036,29 @@ const renderCrosswordGrid = () => {
       </div>
 
       {/* جدول و شماره‌های سطرها */}
-      <div style={{ display: 'flex', direction: 'rtl' }}>
-        {/* شماره‌های سطرها (سمت راست) */}
+      <div style={{ 
+        display: 'flex', 
+        direction: 'rtl',
+        width: '100%',
+        maxWidth: '400px',
+        justifyContent: 'center'
+      }}>
+        {/* شماره‌های سطرها */}
         <div style={{ 
           display: 'grid',
-          gridTemplateRows: `repeat(${size}, 60px)`,
-          gap: '2px',
-          marginLeft: '5px' // 🆕 تغییر: فاصله از سمت چپ
+          gridTemplateRows: `repeat(${size}, minmax(35px, 1fr))`,
+          gap: '2px'
         }}>
           {Array.from({ length: size }, (_, rowIndex) => (
             <div
               key={`row-${rowIndex}`}
               style={{
-                width: '40px',
-                height: '60px',
+                width: '30px',
+                height: '35px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '18px',
+                fontSize: '12px',
                 fontFamily: 'Vazir, Tahoma, sans-serif',
                 fontWeight: 'bold',
                 color: '#666',
@@ -1058,9 +1073,10 @@ const renderCrosswordGrid = () => {
         {/* خود جدول */}
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: `repeat(${size}, 60px)`,
+          gridTemplateColumns: `repeat(${size}, minmax(35px, 1fr))`,
           gap: '2px',
-          direction: 'rtl'
+          direction: 'rtl',
+          flex: 1
         }}>
           {dailyPuzzle.grid.map((row, rowIndex) => (
             row.map((cell, colIndex) => (
@@ -1068,18 +1084,19 @@ const renderCrosswordGrid = () => {
                 key={`${rowIndex}-${colIndex}`}
                 onClick={() => currentUser && handleCellSelect(rowIndex, colIndex)}
                 style={{
-                  width: '60px',
-                  height: '60px',
+                  width: '100%',
+                  height: '35px', // کاهش ارتفاع
+                  aspectRatio: '1',
                   backgroundColor: cell === 0 ? '#333' : 
                     selectedCell[0] === rowIndex && selectedCell[1] === colIndex ? '#0070f3' :
                     cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '#2E7D32' :
                     cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct' ? '#4CAF50' :
                     cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'wrong' ? '#f44336' : '#fff',
-                  border: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '2px solid #1B5E20' : '2px solid #ccc',
+                  border: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '2px solid #1B5E20' : '1px solid #ccc', // کاهش border
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '20px',
+                  fontSize: '14px', // کاهش فونت
                   fontWeight: 'bold',
                   cursor: currentUser && cell === 1 && cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] !== 'locked' && !gameCompleted ? 'pointer' : 'default',
                   color: (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked') || (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct') ? '#fff' : '#000',
@@ -1675,39 +1692,57 @@ const getMotivationalMessage = (accuracy) => {
               </div>
             )}
 
-            {/* صفحه کلید - فقط وقتی بازی باز است */}
-            {!gameCompleted && (
-              <div style={{ marginBottom: '30px' }}>
-                <h3>صفحه کلید</h3>
-                {persianKeyboard.map((row, rowIndex) => (
-                  <div key={rowIndex} style={{ 
-                    display: 'flex', 
-                    justifyContent: 'center', 
-                    gap: '5px', 
-                    marginBottom: '10px' 
-                  }}>
-                    {row.map(char => (
-                      <div
-                        key={char}
-                        onClick={() => handleInput(char)}
-                        style={{
-                          padding: '10px 15px',
-                          fontSize: '16px',
-                          border: '1px solid #ccc',
-                          backgroundColor: '#f0f0f0',
-                          cursor: 'pointer',
-                          borderRadius: '5px',
-                          minWidth: '40px',
-                          textAlign: 'center'
-                        }}
-                      >
-                        {char}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
+     {/* صفحه کلید - فقط وقتی بازی باز است */}
+{!gameCompleted && (
+  <div style={{ 
+    marginBottom: '20px',
+    padding: '10px',
+    width: '100%',
+    boxSizing: 'border-box'
+  }}>
+    <h3 style={{ textAlign: 'center', marginBottom: '15px', fontSize: '16px' }}>صفحه کلید</h3>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: '6px',
+      width: '100%',
+      padding: '0 5px' // فاصله از کناره‌ها
+    }}>
+      {persianKeyboard.map((row, rowIndex) => (
+        <div key={rowIndex} style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          gap: '3px', 
+          marginBottom: '6px',
+          flexWrap: 'wrap',
+          width: '100%',
+          maxWidth: '350px' // محدود کردن عرض
+        }}>
+          {row.map(char => (
+            <div
+              key={char}
+              onClick={() => handleInput(char)}
+              style={{
+                padding: '6px 8px',
+                fontSize: '13px',
+                border: '1px solid #ccc',
+                backgroundColor: '#f0f0f0',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                minWidth: '30px',
+                textAlign: 'center',
+                flexShrink: 0
+              }}
+            >
+              {char}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
           </div>
         )}
       </div>

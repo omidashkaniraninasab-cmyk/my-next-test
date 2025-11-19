@@ -1,6 +1,7 @@
 import { createUserProfile } from '@/lib/db';
 import { createSession } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
+import { sql } from '@/lib/db'; // اضافه کردن import برای دیتابیس
 
 export async function POST(request) {
   try {
@@ -55,10 +56,28 @@ export async function POST(request) {
 
     console.log('User created:', user.id);
 
+    // ✅ 🆕 تولید user_code و آپدیت کاربر
+    const userCode = 'user_' + (10000000 + user.id);
+    const displayName = `${firstName} ${lastName}`.trim();
+    
+    try {
+      await sql`
+        UPDATE user_profiles 
+        SET 
+          user_code = ${userCode},
+          display_name = ${displayName}
+        WHERE id = ${user.id}
+      `;
+      console.log('✅ User code assigned:', userCode);
+    } catch (updateError) {
+      console.error('❌ Error updating user code:', updateError);
+      // ادامه می‌دیم حتی اگر آپدیت user_code خطا داد
+    }
+
     // ✅ ایجاد session
     const sessionId = await createSession(user);
 
-    // ✅ برگرداندن response
+    // ✅ برگرداندن response با اطلاعات کامل کاربر
     return new Response(JSON.stringify({ 
       success: true,
       user: {
@@ -68,7 +87,9 @@ export async function POST(request) {
         first_name: user.first_name,
         last_name: user.last_name,
         registration_date: user.registration_date,
-        bank_card_number: user.bank_card_number
+        bank_card_number: user.bank_card_number,
+        user_code: userCode, // 🆕 اضافه شدن user_code
+        display_name: displayName // 🆕 اضافه شدن display_name
       },
       sessionId: sessionId
     }), {
