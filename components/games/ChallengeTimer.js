@@ -2,8 +2,8 @@
 
 const ChallengeTimer = ({ timeLeft, isActive }) => {
   const getTimerColor = () => {
-    if (timeLeft <= 3) return 'bg-red-500';
-    if (timeLeft <= 7) return 'bg-orange-500';
+    if (timeLeft <= 5) return 'bg-red-500';
+    if (timeLeft <= 10) return 'bg-orange-500';
     return 'bg-green-500';
   };
 

@@ -25,7 +25,8 @@ const DailyChallenge = ({ currentUser }) => {
       <div className="bg-gradient-to-r from-green-500 to-blue-500 text-white p-6 rounded-lg shadow-lg">
         <div className="text-center">
           <h1 className="text-3xl font-bold mb-2">🎯 چالش سریع روزانه</h1>
-          <p className="text-lg opacity-90">سیستم کاملاً مستقل از کراسورد - رتبه‌بندی جداگانه</p>
+          <p className="text-lg opacity-90"> سیستم کاملاً مستقل از کراسورد - رتبه‌بندی جداگانه  </p>
+          <p className="text-lg opacity-90"> زمان بازی: ۱۵ ثانیه  </p>
         </div>
       </div>
 
