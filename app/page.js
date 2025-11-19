@@ -6,6 +6,7 @@ import { getSessionFromCookie, logout } from '@/lib/client-auth';
 import ProgressChart from '../components/ProgressChart';
 import GameHistory from '../components/GameHistory';
 import DailyChallenge from '@/components/games/DailyChallenge';
+import MemoryGame from '@/components/games/MemoryGame/MemoryGame';
 
 const LEVEL_SYSTEM = {
   1: { xpRequired: 0, title: "تازه‌کار" },
@@ -1848,6 +1849,11 @@ const getMotivationalMessage = (accuracy) => {
      {/* چالش سریع روزانه - کاملاً مستقل */}
 <div className="mb-8">
   <DailyChallenge currentUser={currentUser} />
+</div>
+
+{/* بازی کارت‌های حافظه - کاملاً مستقل */}
+<div className="mb-8">
+  <MemoryGame currentUser={currentUser} />
 </div>
 
       {/* لیست کاربران */}
