@@ -1,70 +1,40 @@
 import { NextResponse } from 'next/server';
-
-// دیتابیس موقت برای چالش روزانه (کاملاً مستقل)
-const dailyChallengeDB = {
-  // سوالات چالش
-  questions: [
-    {
-      id: 1,
-      text: "با حرف 'ب' اسم دخترانه بسازید",
-      letter: "ب",
-      category: "اسم دخترانه",
-      validAnswers: ["بیتا", "بهار", "باران", "بهناز", "بدری", "پریسا", "پگاه", "بنفشه", "بهشت", "بیدا"]
-    },
-    {
-      id: 2, 
-      text: "با حرف 'آ' اسم پسرانه بسازید",
-      letter: "آ", 
-      category: "اسم پسرانه",
-      validAnswers: ["آرش", "آرمان", "آرین", "آبتین", "آذر", "آراد", "آرمین"]
-    },
-    {
-      id: 3,
-      text: "با حرف 'م' میوه نام ببرید",
-      letter: "م",
-      category: "میوه", 
-      validAnswers: ["موز", "مشمش", "ملون", "مانگو", "میوه"]
-    }
-  ],
-  
-  // کاربران چالش (کاملاً مستقل)
-  challengeUsers: new Map(),
-  
-  // پاسخ‌های چالش
-  challengeAnswers: new Map(),
-  
-  // امتیازات چالش
-  challengeScores: new Map()
-};
-
-// پاک کردن داده‌های قدیمی
-function cleanupOldData() {
-  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-  
-  // پاک کردن پاسخ‌های قدیمی
-  dailyChallengeDB.challengeAnswers.forEach((value, key) => {
-    if (value.timestamp < oneDayAgo) {
-      dailyChallengeDB.challengeAnswers.delete(key);
-    }
-  });
-}
+import { sql } from '@/lib/db';
 
 export async function GET() {
   try {
-    cleanupOldData();
+    console.log('🎯 دریافت سوال روزانه چالش...');
     
-    // گرفتن سوال روز برای چالش
+    // گرفتن سوال روز
     const today = new Date().getDate();
-    const questionIndex = today % dailyChallengeDB.questions.length;
-    const dailyQuestion = dailyChallengeDB.questions[questionIndex];
+    const questions = await sql`
+      SELECT * FROM daily_challenge_questions 
+      ORDER BY id
+    `;
+    
+    if (questions.length === 0) {
+      return NextResponse.json({ success: false, error: 'هیچ سوالی در سیستم وجود ندارد' }, { status: 404 });
+    }
+    
+    const questionIndex = today % questions.length;
+    const dailyQuestion = questions[questionIndex];
+    
+    console.log('✅ سوال روزانه دریافت شد:', dailyQuestion.id);
     
     return NextResponse.json({
       success: true,
-      question: dailyQuestion,
+      question: {
+        id: dailyQuestion.id,
+        text: dailyQuestion.text,
+        letter: dailyQuestion.letter,
+        category: dailyQuestion.category,
+        validAnswers: dailyQuestion.valid_answers
+      },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    return NextResponse.json({ success: false, error: 'خطا در دریافت سوال' }, { status: 500 });
+    console.error('❌ خطا در دریافت سوال:', error);
+    return NextResponse.json({ success: false, error: 'خطای سرور' }, { status: 500 });
   }
 }
 
@@ -72,79 +42,117 @@ export async function POST(request) {
   try {
     const { userId, answer, questionId } = await request.json();
     
-    // اعتبارسنجی داده‌های ورودی
+    console.log('🎯 ثبت پاسخ چالش:', { userId, questionId, answer });
+    
     if (!userId || !answer || !questionId) {
       return NextResponse.json({ success: false, error: 'داده‌های ناقص' }, { status: 400 });
     }
     
-    // پیدا کردن سوال چالش
-    const question = dailyChallengeDB.questions.find(q => q.id === questionId);
-    if (!question) {
+    // پیدا کردن سوال و پاسخ‌های معتبر
+    const questions = await sql`
+      SELECT * FROM daily_challenge_questions WHERE id = ${questionId}
+    `;
+    
+    if (!questions || questions.length === 0) {
       return NextResponse.json({ success: false, error: 'سوال چالش پیدا نشد' }, { status: 404 });
     }
     
-    // اعتبارسنجی پاسخ در چالش
-    const isValid = question.validAnswers.includes(answer.trim());
+    const question = questions[0];
+    const validAnswers = question.valid_answers;
+    const userAnswer = answer.trim();
+    
+    const isValid = validAnswers.includes(userAnswer);
+    
     if (!isValid) {
       return NextResponse.json({ success: false, error: 'پاسخ معتبر نیست' }, { status: 400 });
     }
     
-    // ثبت کاربر در سیستم چالش (اگر وجود ندارد)
-    if (!dailyChallengeDB.challengeUsers.has(userId)) {
-      dailyChallengeDB.challengeUsers.set(userId, {
-        userId,
-        totalScore: 0,
-        todayScore: 0,
-        gamesPlayed: 0,
-        createdAt: new Date()
-      });
-    }
+    // محاسبه آمار پاسخ‌ها برای این سوال
+    const answerStats = await sql`
+      SELECT answer, COUNT(*) as count 
+      FROM daily_challenge_answers 
+      WHERE question_id = ${questionId} 
+      GROUP BY answer
+    `;
     
-    // ذخیره پاسخ کاربر در چالش
-    const answerKey = `${userId}-${questionId}-${Date.now()}`;
-    dailyChallengeDB.challengeAnswers.set(answerKey, {
-      userId,
-      questionId,
-      answer: answer.trim(),
-      timestamp: new Date()
+    const stats = {};
+    answerStats.forEach(row => {
+      stats[row.answer] = parseInt(row.count);
     });
     
-    // محاسبه آمار پاسخ‌ها در چالش
-    const stats = {};
-    dailyChallengeDB.challengeAnswers.forEach((value) => {
-      if (value.questionId === questionId) {
-        stats[value.answer] = (stats[value.answer] || 0) + 1;
+    // محاسبه امتیاز
+    const userCount = stats[userAnswer] || 0;
+    const totalAnswers = userCount + 1; // +1 برای پاسخ فعلی
+    
+    let score = 100;
+    if (totalAnswers === 1) score = 1000;
+    else if (totalAnswers <= 10) score = 750;
+    else if (totalAnswers <= 100) score = 500;
+    else if (totalAnswers <= 1000) score = 250;
+    
+    console.log('📊 آمار پاسخ:', { userAnswer, userCount, totalAnswers, score });
+    
+    // استفاده از تراکنش برای عملیات دیتابیس
+    await sql.begin(async (sql) => {
+      // ذخیره پاسخ کاربر
+      await sql`
+        INSERT INTO daily_challenge_answers (user_id, question_id, answer, score)
+        VALUES (${userId}, ${questionId}, ${userAnswer}, ${score})
+      `;
+      
+      // بررسی وجود کاربر در جدول امتیازات
+      const existingScores = await sql`
+        SELECT * FROM daily_challenge_scores WHERE user_id = ${userId}
+      `;
+      
+      if (existingScores.length > 0) {
+        // آپدیت امتیاز موجود
+        await sql`
+          UPDATE daily_challenge_scores 
+          SET 
+            total_score = total_score + ${score},
+            today_score = today_score + ${score},
+            games_played = games_played + 1,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE user_id = ${userId}
+        `;
+        console.log('✅ امتیاز کاربر آپدیت شد');
+      } else {
+        // ایجاد امتیاز جدید
+        await sql`
+          INSERT INTO daily_challenge_scores (user_id, total_score, today_score, games_played)
+          VALUES (${userId}, ${score}, ${score}, 1)
+        `;
+        console.log('✅ امتیاز جدید کاربر ایجاد شد');
       }
     });
     
-    // محاسبه امتیاز در چالش
-    const userCount = stats[answer.trim()] || 1;
-    let score = 100;
-    if (userCount === 1) score = 1000;
-    else if (userCount <= 10) score = 750;
-    else if (userCount <= 100) score = 500;
-    else if (userCount <= 1000) score = 250;
+    // گرفتن امتیاز نهایی کاربر
+    const userScores = await sql`
+      SELECT * FROM daily_challenge_scores WHERE user_id = ${userId}
+    `;
     
-    // آپدیت امتیاز کاربر در سیستم چالش
-    const userData = dailyChallengeDB.challengeUsers.get(userId);
-    userData.totalScore += score;
-    userData.todayScore += score;
-    userData.gamesPlayed += 1;
+    const userScore = userScores[0];
     
-    // ذخیره امتیاز این بازی در چالش
-    dailyChallengeDB.challengeScores.set(answerKey, score);
+    console.log('🎉 پاسخ با موفقیت ثبت شد:', {
+      userId,
+      score,
+      totalScore: userScore.total_score,
+      todayScore: userScore.today_score
+    });
     
     return NextResponse.json({
       success: true,
       score,
-      userCount,
-      totalScore: userData.totalScore,
-      todayScore: userData.todayScore,
-      gamesPlayed: userData.gamesPlayed,
+      userCount: totalAnswers,
+      totalScore: userScore.total_score,
+      todayScore: userScore.today_score,
+      gamesPlayed: userScore.games_played,
       message: 'پاسخ در چالش ثبت شد'
     });
     
   } catch (error) {
+    console.error('❌ خطا در ثبت پاسخ:', error);
     return NextResponse.json({ success: false, error: 'خطای سرور' }, { status: 500 });
   }
 }

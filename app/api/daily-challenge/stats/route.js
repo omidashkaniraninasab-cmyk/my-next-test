@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server';
-
-const dailyChallengeDB = {
-  challengeUsers: new Map(),
-  challengeAnswers: new Map()
-};
+import { sql } from '@/lib/db';
 
 export async function GET(request) {
   try {
@@ -14,10 +10,15 @@ export async function GET(request) {
       return NextResponse.json({ success: false, error: 'userId required' }, { status: 400 });
     }
     
-    // گرفتن آمار کاملاً مستقل کاربر از چالش
-    const userData = dailyChallengeDB.challengeUsers.get(userId);
+    console.log('🎯 دریافت آمار چالش برای کاربر:', userId);
     
-    if (!userData) {
+    // گرفتن آمار کاربر از دیتابیس
+    const userStats = await sql`
+      SELECT * FROM daily_challenge_scores WHERE user_id = ${userId}
+    `;
+    
+    if (!userStats || userStats.length === 0) {
+      console.log('📝 کاربر جدید در چالش:', userId);
       return NextResponse.json({ 
         success: true, 
         stats: {
@@ -31,20 +32,33 @@ export async function GET(request) {
       });
     }
     
-    // محاسبه رتبه کاربر در چالش
-    const allUsers = Array.from(dailyChallengeDB.challengeUsers.values());
-    const sortedUsers = allUsers.sort((a, b) => b.totalScore - a.totalScore);
-    const userRank = sortedUsers.findIndex(user => user.userId === userId) + 1;
+    const userData = userStats[0];
+    
+    // محاسبه رتبه کاربر
+    const rankResult = await sql`
+      SELECT COUNT(*) + 1 as rank
+      FROM daily_challenge_scores 
+      WHERE total_score > ${userData.total_score}
+    `;
+    
+    // تعداد کل بازیکنان
+    const totalPlayersResult = await sql`
+      SELECT COUNT(*) as count FROM daily_challenge_scores
+    `;
+    const totalPlayers = totalPlayersResult[0]?.count || 0;
     
     const stats = {
-      totalScore: userData.totalScore,
-      todayScore: userData.todayScore,
-      gamesPlayed: userData.gamesPlayed,
-      averageScore: userData.gamesPlayed > 0 ? Math.round(userData.totalScore / userData.gamesPlayed) : 0,
-      rank: userRank,
-      totalPlayers: sortedUsers.length,
+      totalScore: userData.total_score,
+      todayScore: userData.today_score,
+      gamesPlayed: userData.games_played,
+      averageScore: userData.games_played > 0 ? 
+        Math.round(userData.total_score / userData.games_played) : 0,
+      rank: rankResult[0]?.rank || 1,
+      totalPlayers: totalPlayers,
       gameType: 'daily-challenge'
     };
+    
+    console.log('✅ آمار کاربر دریافت شد:', stats);
     
     return NextResponse.json({
       success: true,
@@ -52,6 +66,7 @@ export async function GET(request) {
     });
     
   } catch (error) {
+    console.error('❌ خطا در دریافت آمار:', error);
     return NextResponse.json({ success: false, error: 'خطای سرور' }, { status: 500 });
   }
 }

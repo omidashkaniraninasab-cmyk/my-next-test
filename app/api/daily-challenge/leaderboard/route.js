@@ -1,36 +1,50 @@
 import { NextResponse } from 'next/server';
-
-// دیتابیس موقت
-const dailyChallengeDB = {
-  challengeUsers: new Map(),
-  challengeScores: new Map()
-};
+import { sql } from '@/lib/db';
 
 export async function GET() {
   try {
-    // ساخت رتبه‌بندی کاملاً مستقل برای چالش
-    const usersArray = Array.from(dailyChallengeDB.challengeUsers.values());
+    console.log('🎯 دریافت رتبه‌بندی چالش...');
     
-    // مرتب‌سازی بر اساس امتیاز کل چالش
-    const sortedUsers = usersArray.sort((a, b) => b.totalScore - a.totalScore);
+    // گرفتن رتبه‌بندی از دیتابیس
+    const leaderboard = await sql`
+      SELECT 
+        user_id,
+        total_score,
+        today_score,
+        games_played,
+        created_at
+      FROM daily_challenge_scores 
+      ORDER BY total_score DESC
+      LIMIT 50
+    `;
     
-    const leaderboard = sortedUsers.map((user, index) => ({
+    const leaderboardWithRanks = leaderboard.map((user, index) => ({
       rank: index + 1,
-      userId: user.userId,
-      totalScore: user.totalScore,
-      gamesPlayed: user.gamesPlayed,
-      todayScore: user.todayScore
+      userId: user.user_id,
+      totalScore: user.total_score,
+      gamesPlayed: user.games_played,
+      todayScore: user.today_score,
+      joinedDate: user.created_at
     }));
+    
+    // تعداد کل بازیکنان
+    const totalPlayersResult = await sql`
+      SELECT COUNT(*) as count FROM daily_challenge_scores
+    `;
+    const totalPlayers = totalPlayersResult[0]?.count || 0;
+    
+    console.log('✅ رتبه‌بندی دریافت شد:', { totalPlayers, topPlayers: leaderboard.length });
     
     return NextResponse.json({
       success: true,
-      leaderboard,
+      leaderboard: leaderboardWithRanks,
       gameType: 'daily-challenge',
-      totalPlayers: sortedUsers.length,
+      totalPlayers,
       updatedAt: new Date().toISOString()
     });
     
   } catch (error) {
+    console.error('❌ خطا در دریافت رتبه‌بندی:', error);
     return NextResponse.json({ success: false, error: 'خطای سرور' }, { status: 500 });
   }
 }
