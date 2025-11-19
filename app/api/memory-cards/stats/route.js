@@ -19,7 +19,10 @@ export async function GET(request) {
       WHERE user_id = ${userId} AND level = ${level}
     `;
     
+    console.log('📋 نتیجه کوئری آمار:', userStats);
+    
     if (userStats.length === 0) {
+      console.log('📝 کاربر هنوز بازی نکرده است');
       return NextResponse.json({ 
         success: true, 
         stats: {
@@ -36,19 +39,26 @@ export async function GET(request) {
     const averageScore = stats.games_played > 0 ? 
       Math.round(stats.total_score / stats.games_played) : 0;
     
+    const result = {
+      bestScore: stats.best_score || 0,
+      bestMoves: stats.best_moves || 0,
+      gamesPlayed: stats.games_played || 0,
+      totalScore: stats.total_score || 0,
+      averageScore: averageScore
+    };
+    
+    console.log('✅ آمار کاربر:', result);
+    
     return NextResponse.json({
       success: true,
-      stats: {
-        bestScore: stats.best_score,
-        bestMoves: stats.best_moves,
-        gamesPlayed: stats.games_played,
-        totalScore: stats.total_score,
-        averageScore: averageScore
-      }
+      stats: result
     });
     
   } catch (error) {
     console.error('❌ خطا در دریافت آمار:', error);
-    return NextResponse.json({ success: false, error: 'خطای سرور' }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: 'خطای سرور در دریافت آمار' 
+    }, { status: 500 });
   }
 }
