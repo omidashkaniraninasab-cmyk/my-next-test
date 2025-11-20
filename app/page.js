@@ -1667,6 +1667,8 @@ const getMotivationalMessage = (accuracy) => {
          !todayGameCompleted && 
          !gameCompleted && (
           <div style={{ marginBottom: '40px' }}>
+             {/* 🆕 این خط رو اضافه کنید */}
+    {dailyPuzzle && userInput.length === 0 && initializeGame()}
             {/* محتوای جدول و صفحه کلید */}
            {renderCrosswordGrid()}
 
