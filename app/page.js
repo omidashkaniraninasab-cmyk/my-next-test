@@ -1011,15 +1011,74 @@ const calculateDailyPerformance = () => {
 
 // این رو قبل از return اصلی اضافه کن - مثلاً بعد از توابع دیگر
 const renderCrosswordGrid = () => {
-  if (!dailyPuzzle) return null;
+  console.log('🎨 renderCrosswordGrid called');
+  
+  if (!dailyPuzzle) {
+    console.log('❌ No daily puzzle');
+    return <div>❌ هیچ جدولی برای نمایش وجود ندارد</div>;
+  }
   
   const size = dailyPuzzle.size;
-  
+  console.log('🔍 Grid details:', {
+    size: size,
+    userInputLength: userInput.length,
+    cellStatusLength: cellStatus.length,
+    hasGrid: !!dailyPuzzle.grid,
+    gridSize: dailyPuzzle.grid?.length
+  });
+
+  // 🆕 تست ساده - اگر userInput خالی هست، یک جدول تستی نمایش بده
+  if (userInput.length === 0 || cellStatus.length === 0) {
+    console.log('⚠️ Using fallback grid');
+    return (
+      <div style={{ 
+        padding: '20px', 
+        backgroundColor: '#ffeb3b', 
+        color: '#333',
+        textAlign: 'center',
+        marginBottom: '20px',
+        borderRadius: '8px',
+        border: '2px solid #ffc107'
+      }}>
+        <h3>🧩 جدول تستی</h3>
+        <p>این یک جدول تستی است - بازی initialize شده اما داده‌ها خالی هستند</p>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${size}, 40px)`,
+          gap: '2px',
+          justifyContent: 'center',
+          margin: '20px auto'
+        }}>
+          {Array.from({ length: size * size }, (_, index) => (
+            <div
+              key={index}
+              style={{
+                width: '40px',
+                height: '40px',
+                backgroundColor: '#e0e0e0',
+                border: '1px solid #ccc',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '16px',
+                fontWeight: 'bold'
+              }}
+            >
+              {index % size}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const toPersianNumber = (number) => {
     const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
     return number.toString().replace(/\d/g, (digit) => persianDigits[parseInt(digit)]);
   };
 
+  console.log('✅ Rendering actual crossword grid');
+  
   return (
     <div style={{ 
       display: 'flex', 
@@ -1027,18 +1086,19 @@ const renderCrosswordGrid = () => {
       alignItems: 'center',
       marginBottom: '20px',
       width: '100%',
-      padding: '0 10px', // اضافه کردن padding برای فاصله از کناره‌ها
+      padding: '0 10px',
       boxSizing: 'border-box'
     }}>
+      {/* بقیه کدهای renderCrosswordGrid که قبلاً داشتید */}
       {/* شماره‌های ستون‌ها */}
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: `30px repeat(${size}, minmax(35px, 1fr))`, // کاهش سایز برای موبایل
+        gridTemplateColumns: `30px repeat(${size}, minmax(35px, 1fr))`,
         gap: '2px',
         marginBottom: '5px',
         direction: 'rtl',
         width: '100%',
-        maxWidth: '400px' // کاهش حداکثر عرض
+        maxWidth: '400px'
       }}>
         <div></div>
         {Array.from({ length: size }, (_, colIndex) => (
@@ -1050,7 +1110,7 @@ const renderCrosswordGrid = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '12px', // کاهش بیشتر فونت
+              fontSize: '12px',
               fontFamily: 'Vazir, Tahoma, sans-serif',
               fontWeight: 'bold',
               color: '#666',
@@ -1112,18 +1172,18 @@ const renderCrosswordGrid = () => {
                 onClick={() => currentUser && handleCellSelect(rowIndex, colIndex)}
                 style={{
                   width: '100%',
-                  height: '35px', // کاهش ارتفاع
+                  height: '35px',
                   aspectRatio: '1',
                   backgroundColor: cell === 0 ? '#333' : 
                     selectedCell[0] === rowIndex && selectedCell[1] === colIndex ? '#0070f3' :
                     cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '#2E7D32' :
                     cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct' ? '#4CAF50' :
                     cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'wrong' ? '#f44336' : '#fff',
-                  border: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '2px solid #1B5E20' : '1px solid #ccc', // کاهش border
+                  border: cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked' ? '2px solid #1B5E20' : '1px solid #ccc',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '14px', // کاهش فونت
+                  fontSize: '14px',
                   fontWeight: 'bold',
                   cursor: currentUser && cell === 1 && cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] !== 'locked' && !gameCompleted ? 'pointer' : 'default',
                   color: (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'locked') || (cellStatus[rowIndex] && cellStatus[rowIndex][colIndex] === 'correct') ? '#fff' : '#000',
@@ -1688,36 +1748,72 @@ const getMotivationalMessage = (accuracy) => {
           </div>
         )}
 
-       {/* بازی فعال - فقط وقتی همه شرایط زیر برقرار باشد */}
-{!dailyPuzzle?.closed && 
- currentUser && 
- !todayGameCompleted && 
- !gameCompleted && (
+  {/* بازی فعال - تست کامل */}
+{!dailyPuzzle?.closed && currentUser && (
   <div style={{ marginBottom: '40px' }}>
     
-    {/* 🆕 این خط رو اضافه کنید - بدون useEffect */}
-    {dailyPuzzle && currentUser && !userInput.length && (() => {
-      console.log('🎮 Auto-initializing game in render...');
-      initializeGame();
-      return null;
-    })()}
-    
-    {/* 🆕 تست وضعیت */}
+    {/* 🆕 دیباگ اطلاعات */}
     <div style={{
       padding: '15px', 
+      backgroundColor: '#ff9800', 
+      color: 'white',
+      textAlign: 'center',
+      marginBottom: '15px',
+      borderRadius: '8px',
+      fontSize: '14px'
+    }}>
+      🔍 دیباگ: Puzzle: {dailyPuzzle ? '✅' : '❌'} | 
+      User: {currentUser ? '✅' : '❌'} | 
+      Input: {userInput.length} | 
+      todayGameCompleted: {todayGameCompleted ? '✅' : '❌'} |
+      gameCompleted: {gameCompleted ? '✅' : '❌'}
+    </div>
+
+    {/* 🆕强制 فراخوانی initializeGame */}
+    {(() => {
+      console.log('🎯强制 اجرای initializeGame...');
+      if (dailyPuzzle && currentUser) {
+        console.log('🔍 شرایط مناسب برای initializeGame');
+        if (userInput.length === 0) {
+          console.log('🚀 اجرای initializeGame');
+          initializeGame();
+        } else {
+          console.log('⏩ بازی قبلاً initialize شده');
+        }
+      }
+      return null;
+    })()}
+
+    {/* 🆕 تست ساده */}
+    <div style={{
+      padding: '20px', 
       backgroundColor: '#4CAF50', 
       color: 'white',
       textAlign: 'center',
       marginBottom: '15px',
       borderRadius: '8px',
-      fontSize: '16px',
+      fontSize: '18px',
       fontWeight: 'bold'
     }}>
-      🎯 بازی فعال - امروز هنوز بازی نکرده‌اید
+      ✅ TEST: این متن باید حتماً دیده شود!
     </div>
-    
-    {/* محتوای جدول و صفحه کلید */}
+
+    {/* محتوای جدول */}
     {renderCrosswordGrid()}
+
+    {/* اگر جدول خالیه، پیام نمایش بده */}
+    {dailyPuzzle && userInput.length === 0 && (
+      <div style={{
+        padding: '20px', 
+        backgroundColor: '#f44336', 
+        color: 'white',
+        textAlign: 'center',
+        marginBottom: '15px',
+        borderRadius: '8px'
+      }}>
+        ❌ مشکل: تابع renderCrosswordGrid خالی برمی‌گرداند
+      </div>
+    )}
 
     {/* راهنما */}
     {dailyPuzzle && (
@@ -1741,7 +1837,7 @@ const getMotivationalMessage = (accuracy) => {
       </div>
     )}
 
-    {/* صفحه کلید - فقط وقتی بازی باز است */}
+    {/* صفحه کلید */}
     {!gameCompleted && (
       <div style={{ 
         marginBottom: '20px',
