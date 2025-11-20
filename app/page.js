@@ -915,18 +915,45 @@ const checkGameCompletion = async () => {
     }
   };
 
-  const checkGameStatus = async (userId) => {
-    try {
-      const response = await fetch(`/api/game/status?userId=${userId}`);
-      if (response.ok) {
-        const status = await response.json();
-        setTodayGameCompleted(status.today_game_completed);
-        console.log('🎮 Game status:', status.today_game_completed ? 'Completed' : 'Not completed');
+ const checkGameStatus = async (userId) => {
+  try {
+    console.log('🔍 Checking game status for user:', userId);
+    
+    const response = await fetch(`/api/game/status?userId=${userId}`);
+    
+    if (response.ok) {
+      const status = await response.json();
+      console.log('🎮 Raw game status from API:', status);
+      
+      // 🆕 دیباگ دقیق‌تر
+      const isCompleted = Boolean(status.today_game_completed);
+      console.log('🔍 Processed game status:', {
+        today_game_completed: status.today_game_completed,
+        isCompleted: isCompleted,
+        type: typeof status.today_game_completed
+      });
+      
+      setTodayGameCompleted(isCompleted);
+      console.log('🎮 Game status:', isCompleted ? 'Completed' : 'Not completed');
+      
+      // 🆕 اگر بازی کامل شده، لاگ بیشتر
+      if (isCompleted) {
+        console.log('ℹ️ User has already completed today\'s game');
+      } else {
+        console.log('🎯 User can play today\'s game');
       }
-    } catch (error) {
-      console.error('Error checking game status:', error);
+      
+    } else {
+      console.error('❌ Error checking game status:', response.status);
+      // 🆕 در صورت خطا، بازی رو باز بذار
+      setTodayGameCompleted(false);
     }
-  };
+  } catch (error) {
+    console.error('❌ Error checking game status:', error);
+    // 🆕 در صورت خطا، بازی رو باز بذار
+    setTodayGameCompleted(false);
+  }
+};
 
 
 // تابع محاسبه عملکرد روزانه با درنظرگیری تاریخچه اشتباهات
@@ -1661,92 +1688,112 @@ const getMotivationalMessage = (accuracy) => {
           </div>
         )}
 
-        {/* بازی فعال - فقط وقتی همه شرایط زیر برقرار باشد */}
-        {!dailyPuzzle?.closed && 
-         currentUser && 
-         !todayGameCompleted && 
-         !gameCompleted && (
-          <div style={{ marginBottom: '40px' }}>
-             {/* 🆕 این خط رو اضافه کنید */}
-    {dailyPuzzle && userInput.length === 0 && initializeGame()}
-            {/* محتوای جدول و صفحه کلید */}
-           {renderCrosswordGrid()}
-
-            {/* راهنما */}
-            {dailyPuzzle && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '14px' }}>
-                <div>
-                  <h3>➡️ افقی</h3>
-                  {Object.entries(dailyPuzzle.across).map(([num, clue]) => (
-                    <p key={num} style={{ margin: '5px 0' }}>
-                      <strong>{num}:</strong> {clue.clue}
-                    </p>
-                  ))}
-                </div>
-                <div>
-                  <h3>⬇️ عمودی</h3>
-                  {Object.entries(dailyPuzzle.down).map(([num, clue]) => (
-                    <p key={num} style={{ margin: '5px 0' }}>
-                      <strong>{num}:</strong> {clue.clue}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
-
-     {/* صفحه کلید - فقط وقتی بازی باز است */}
-{!gameCompleted && (
-  <div style={{ 
-    marginBottom: '20px',
-    padding: '10px',
-    width: '100%',
-    boxSizing: 'border-box'
-  }}>
-    <h3 style={{ textAlign: 'center', marginBottom: '15px', fontSize: '16px' }}>صفحه کلید</h3>
+       {/* بازی فعال - فقط وقتی همه شرایط زیر برقرار باشد */}
+{!dailyPuzzle?.closed && 
+ currentUser && 
+ !todayGameCompleted && 
+ !gameCompleted && (
+  <div style={{ marginBottom: '40px' }}>
+    
+    {/* 🆕 این خط رو اضافه کنید - بدون useEffect */}
+    {dailyPuzzle && currentUser && !userInput.length && (() => {
+      console.log('🎮 Auto-initializing game in render...');
+      initializeGame();
+      return null;
+    })()}
+    
+    {/* 🆕 تست وضعیت */}
     <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: '6px',
-      width: '100%',
-      padding: '0 5px' // فاصله از کناره‌ها
+      padding: '15px', 
+      backgroundColor: '#4CAF50', 
+      color: 'white',
+      textAlign: 'center',
+      marginBottom: '15px',
+      borderRadius: '8px',
+      fontSize: '16px',
+      fontWeight: 'bold'
     }}>
-      {persianKeyboard.map((row, rowIndex) => (
-        <div key={rowIndex} style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          gap: '3px', 
-          marginBottom: '6px',
-          flexWrap: 'wrap',
+      🎯 بازی فعال - امروز هنوز بازی نکرده‌اید
+    </div>
+    
+    {/* محتوای جدول و صفحه کلید */}
+    {renderCrosswordGrid()}
+
+    {/* راهنما */}
+    {dailyPuzzle && (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '14px' }}>
+        <div>
+          <h3>➡️ افقی</h3>
+          {Object.entries(dailyPuzzle.across).map(([num, clue]) => (
+            <p key={num} style={{ margin: '5px 0' }}>
+              <strong>{num}:</strong> {clue.clue}
+            </p>
+          ))}
+        </div>
+        <div>
+          <h3>⬇️ عمودی</h3>
+          {Object.entries(dailyPuzzle.down).map(([num, clue]) => (
+            <p key={num} style={{ margin: '5px 0' }}>
+              <strong>{num}:</strong> {clue.clue}
+            </p>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {/* صفحه کلید - فقط وقتی بازی باز است */}
+    {!gameCompleted && (
+      <div style={{ 
+        marginBottom: '20px',
+        padding: '10px',
+        width: '100%',
+        boxSizing: 'border-box'
+      }}>
+        <h3 style={{ textAlign: 'center', marginBottom: '15px', fontSize: '16px' }}>صفحه کلید</h3>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '6px',
           width: '100%',
-          maxWidth: '350px' // محدود کردن عرض
+          padding: '0 5px'
         }}>
-          {row.map(char => (
-            <div
-              key={char}
-              onClick={() => handleInput(char)}
-              style={{
-                padding: '6px 8px',
-                fontSize: '13px',
-                border: '1px solid #ccc',
-                backgroundColor: '#f0f0f0',
-                cursor: 'pointer',
-                borderRadius: '4px',
-                minWidth: '30px',
-                textAlign: 'center',
-                flexShrink: 0
-              }}
-            >
-              {char}
+          {persianKeyboard.map((row, rowIndex) => (
+            <div key={rowIndex} style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              gap: '3px', 
+              marginBottom: '6px',
+              flexWrap: 'wrap',
+              width: '100%',
+              maxWidth: '350px'
+            }}>
+              {row.map(char => (
+                <div
+                  key={char}
+                  onClick={() => handleInput(char)}
+                  style={{
+                    padding: '6px 8px',
+                    fontSize: '13px',
+                    border: '1px solid #ccc',
+                    backgroundColor: '#f0f0f0',
+                    cursor: 'pointer',
+                    borderRadius: '4px',
+                    minWidth: '30px',
+                    textAlign: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  {char}
+                </div>
+              ))}
             </div>
           ))}
         </div>
-      ))}
-    </div>
+      </div>
+    )}
   </div>
 )}
-          </div>
-        )}
       </div>
 
 
