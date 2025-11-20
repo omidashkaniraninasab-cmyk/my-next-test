@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/daily-refresh",
-      "schedule": "30 11 * * *"  // 12:30 US East = 21:00 ایران
+      "schedule": "30 11 * * *"
     }
   ]
 }
