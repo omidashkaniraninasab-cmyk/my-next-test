@@ -138,11 +138,25 @@ export async function POST(request) {
       totalAnswers,
       score
     });
+
+    // 🔥 گرفتن اطلاعات کاربر برای فیلدهای جدید
+    const userInfo = await sql`
+      SELECT username, user_code, first_name, last_name 
+      FROM user_profiles 
+      WHERE id = ${userId}
+    `;
     
-    // ذخیره پاسخ
+    const user = userInfo[0];
+    const username = user?.username || `user_${userId}`;
+    const userCode = user?.user_code || `UC${userId}`;
+    const displayName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'کاربر';
+    
+    // 🔥 ذخیره پاسخ با فیلدهای جدید
     await sql`
-      INSERT INTO daily_challenge_answers (user_id, question_id, answer, score)
-      VALUES (${userId}, ${questionId}, ${userAnswer}, ${score})
+      INSERT INTO daily_challenge_answers 
+        (user_id, question_id, answer, score, username, user_code, display_name)
+      VALUES 
+        (${userId}, ${questionId}, ${userAnswer}, ${score}, ${username}, ${userCode}, ${displayName})
     `;
     console.log('✅ پاسخ در دیتابیس ذخیره شد');
     
@@ -152,20 +166,27 @@ export async function POST(request) {
     `;
     
     if (existingScores.length > 0) {
+      // 🔥 آپدیت با فیلدهای جدید
       await sql`
         UPDATE daily_challenge_scores 
         SET 
           total_score = total_score + ${score},
           today_score = today_score + ${score},
           games_played = games_played + 1,
+          username = ${username},
+          user_code = ${userCode},
+          display_name = ${displayName},
           updated_at = CURRENT_TIMESTAMP
         WHERE user_id = ${userId}
       `;
       console.log('✅ امتیاز کاربر آپدیت شد');
     } else {
+      // 🔥 ایجاد با فیلدهای جدید
       await sql`
-        INSERT INTO daily_challenge_scores (user_id, total_score, today_score, games_played)
-        VALUES (${userId}, ${score}, ${score}, 1)
+        INSERT INTO daily_challenge_scores 
+          (user_id, total_score, today_score, games_played, username, user_code, display_name)
+        VALUES 
+          (${userId}, ${score}, ${score}, 1, ${username}, ${userCode}, ${displayName})
       `;
       console.log('✅ امتیاز جدید کاربر ایجاد شد');
     }
