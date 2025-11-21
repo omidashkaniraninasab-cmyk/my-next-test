@@ -1,5 +1,5 @@
-// app/api/game/status/route.js
 import { neon } from '@neondatabase/serverless';
+import { getTodayIranDate } from '@/lib/iran-date';
 
 const sql = neon(process.env.DATABASE_URL);
 
@@ -14,38 +14,34 @@ export async function GET(request) {
       return Response.json({ error: 'User ID required' }, { status: 400 });
     }
 
-    // 🆕 **ساده‌شده: فقط اطلاعات کاربر رو بررسی کن**
-    const user = await sql`
-      SELECT today_crossword_score, today_game_completed, last_game_date
-      FROM user_profiles 
-      WHERE id = ${userId}
+    const todayIran = getTodayIranDate();
+    
+    // بررسی دقیق: کاربر امروز بازی کرده؟
+    const todayGames = await sql`
+      SELECT id, completed, score, created_at
+      FROM crossword_games 
+      WHERE user_id = ${userId} 
+      AND completed = true
+      AND DATE(created_at) = CURRENT_DATE
+      ORDER BY created_at DESC 
+      LIMIT 1
     `;
 
-    if (user.length === 0) {
-      return Response.json({ error: 'User not found' }, { status: 404 });
-    }
+    const hasCompletedToday = todayGames.length > 0;
+    const todayScore = todayGames[0]?.score || 0;
 
-    const todayScore = user[0].today_crossword_score || 0;
-    const todayGameCompleted = user[0].today_game_completed;
-    const lastGameDate = user[0].last_game_date;
-
-    // 🆕 **منطق ساده: فقط اگر last_game_date امروز باشه و امتیاز > 0**
-    const isLastGameToday = lastGameDate && 
-      new Date(lastGameDate).toDateString() === new Date().toDateString();
-
-    const isGameCompleted = todayGameCompleted && todayScore > 0 && isLastGameToday;
-
-    console.log('🔍 STATUS API - Simple Result:', {
+    console.log('🔍 STATUS API - Accurate Result:', {
       userId,
+      todayIran,
+      hasCompletedToday,
       todayScore,
-      todayGameCompleted,
-      lastGameDate: lastGameDate ? new Date(lastGameDate).toISOString() : 'null',
-      isLastGameToday,
-      finalStatus: isGameCompleted ? 'COMPLETED' : 'ACTIVE'
+      gameId: todayGames[0]?.id,
+      gameDate: todayGames[0]?.created_at,
+      finalStatus: hasCompletedToday ? 'COMPLETED' : 'ACTIVE'
     });
 
     return Response.json({
-      today_game_completed: isGameCompleted,
+      today_game_completed: hasCompletedToday,
       today_score: todayScore
     });
     

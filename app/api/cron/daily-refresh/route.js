@@ -1,35 +1,39 @@
 import { neon } from '@neondatabase/serverless';
+import { getTodayIranDate, getTomorrowIranDate } from '@/lib/iran-date';
 
 const sql = neon(process.env.DATABASE_URL);
 
 export async function GET() {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const tomorrowIran = getTomorrowIranDate(); // 🆕 فردا رو فعال کن
+    const todayIran = getTodayIranDate(); // 🆕 امروز رو غیرفعال کن
     
-    // غیرفعال کردن پازل دیروز
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    console.log('🔄 Daily refresh started:', {
+      tomorrow: tomorrowIran,
+      today: todayIran
+    });
     
+    // غیرفعال کردن پازل امروز ایران
     await sql`
       UPDATE monthly_puzzles 
       SET is_active = false 
-      WHERE date = ${yesterdayStr}
+      WHERE iran_date = ${todayIran}
     `;
     
-    // فعال کردن پازل امروز
+    // فعال کردن پازل فردا ایران
     await sql`
       UPDATE monthly_puzzles 
       SET is_active = true 
-      WHERE date = ${today}
+      WHERE iran_date = ${tomorrowIran}
     `;
     
-    console.log(`✅ Daily refresh: Activated ${today}, Deactivated ${yesterdayStr}`);
+    console.log(`✅ Daily refresh: Activated ${tomorrowIran}, Deactivated ${todayIran}`);
     
     return Response.json({
       success: true,
-      activated: today,
-      deactivated: yesterdayStr
+      activated: tomorrowIran,
+      deactivated: todayIran,
+      timezone: 'Asia/Tehran'
     });
     
   } catch (error) {
