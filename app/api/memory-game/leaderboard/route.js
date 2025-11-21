@@ -3,7 +3,7 @@ import { sql } from '@/lib/db';
 
 export async function GET() {
   try {
-    console.log('🎯 دریافت رتبه‌بندی چالش...');
+    console.log('🎮 دریافت رتبه‌بندی بازی حافظه...');
     
     // گرفتن رتبه‌بندی از دیتابیس
     const leaderboard = await sql`
@@ -12,9 +12,10 @@ export async function GET() {
         total_score,
         today_score,
         games_played,
+        best_time,
         created_at
-      FROM daily_challenge_scores 
-      ORDER BY total_score DESC, created_at ASC
+      FROM memory_game_scores 
+      ORDER BY total_score DESC, best_time ASC
       LIMIT 50
     `;
     
@@ -25,37 +26,37 @@ export async function GET() {
       totalScore: user.total_score || 0,
       gamesPlayed: user.games_played || 0,
       todayScore: user.today_score || 0,
+      bestTime: user.best_time || 0,
       joinedDate: user.created_at
     }));
     
     // تعداد کل بازیکنان
     const totalPlayersResult = await sql`
-      SELECT COUNT(*) as count FROM daily_challenge_scores
+      SELECT COUNT(*) as count FROM memory_game_scores
     `;
     const totalPlayers = totalPlayersResult[0]?.count || 0;
     
-    console.log('✅ رتبه‌بندی دریافت شد:', { 
+    console.log('✅ رتبه‌بندی بازی حافظه دریافت شد:', { 
       totalPlayers, 
-      topPlayers: leaderboard.length,
-      sampleUser: leaderboardWithRanks[0] // برای دیباگ
+      topPlayers: leaderboard.length 
     });
     
     return NextResponse.json({
       success: true,
       leaderboard: leaderboardWithRanks,
-      gameType: 'daily-challenge',
+      gameType: 'memory-game',
       totalPlayers,
       updatedAt: new Date().toISOString()
     });
     
   } catch (error) {
-    console.error('❌ خطا در دریافت رتبه‌بندی:', error);
+    console.error('❌ خطا در دریافت رتبه‌بندی بازی حافظه:', error);
     
     // 🔥 برگرداندن داده‌های نمونه در صورت خطا
     return NextResponse.json({ 
-      success: true, // true بگذارید تا frontend crash نکند
+      success: true,
       leaderboard: [],
-      gameType: 'daily-challenge',
+      gameType: 'memory-game',
       totalPlayers: 0,
       updatedAt: new Date().toISOString(),
       error: 'خطای موقت در دریافت داده‌ها'

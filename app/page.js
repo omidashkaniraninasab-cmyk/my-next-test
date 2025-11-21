@@ -235,44 +235,82 @@ const loadDailyPuzzle = async () => {
     console.log('✅ Game initialized');
   };
 
-  const loadUserGameState = async (userId) => {
-    try {
-      console.log('🔄 Loading game state for user:', userId);
+ const loadUserGameState = async (userId) => {
+  try {
+    console.log('🔄 Loading game state for user:', userId);
+    
+    const response = await fetch(`/api/game/state?userId=${userId}`);
+    
+    if (response.ok) {
+      const gameState = await response.json();
+      console.log('📦 Game state response:', gameState);
       
-      const response = await fetch(`/api/game/state?userId=${userId}`);
-      
-      if (response.ok) {
-        const gameState = await response.json();
-        console.log('📦 Game state response:', gameState);
+      if (gameState && gameState.userProgress) {
+        console.log('✅ Setting game state from server');
         
-        if (gameState && gameState.userProgress) {
-          console.log('✅ Setting game state from server');
-          
-          const size = dailyPuzzle ? dailyPuzzle.size : 6;
-          
-          const defaultUserInput = Array(size).fill().map(() => Array(size).fill(''));
-          const defaultCellStatus = Array(size).fill().map(() => Array(size).fill('empty'));
-          
-          setUserInput(gameState.userProgress.userInput || defaultUserInput);
-          setCellStatus(gameState.userProgress.cellStatus || defaultCellStatus);
-          setScore(gameState.score || 0);
-          setMistakes(gameState.mistakes || 0);
-          setSelectedCell(gameState.userProgress.selectedCell || [0, 0]);
-          setGameCompleted(gameState.completed || false);
-          setCurrentGameId(gameState.id);
-          
-          console.log('🎮 Game state loaded successfully');
-        } else {
-          console.log('🆕 No active game found, starting new game');
-          startNewGame(userId);
-        }
+        const size = dailyPuzzle ? dailyPuzzle.size : 6;
+        
+        const defaultUserInput = Array(size).fill().map(() => Array(size).fill(''));
+        const defaultCellStatus = Array(size).fill().map(() => Array(size).fill('empty'));
+        
+        setUserInput(gameState.userProgress.userInput || defaultUserInput);
+        setCellStatus(gameState.userProgress.cellStatus || defaultCellStatus);
+        setScore(gameState.score || 0);
+        setMistakes(gameState.mistakes || 0);
+        setSelectedCell(gameState.userProgress.selectedCell || [0, 0]);
+        setGameCompleted(gameState.completed || false);
+        setCurrentGameId(gameState.id);
+        
+        console.log('🎮 Game state loaded successfully');
       } else {
-        console.error('❌ Error loading game state:', response.status);
+        console.log('🆕 No active game found, starting new game');
+        
+        // 🔥 صبر کن تا dailyPuzzle آماده شود قبل از شروع بازی جدید
+        if (dailyPuzzle) {
+          await startNewGame(userId);
+        } else {
+          console.log('⏳ Waiting for dailyPuzzle before starting new game...');
+          // بعد از 2 ثانیه چک کن
+          setTimeout(async () => {
+            if (dailyPuzzle) {
+              await startNewGame(userId);
+            } else {
+              console.log('❌ Still no puzzle available, cannot start game');
+            }
+          }, 2000);
+        }
       }
-    } catch (error) {
-      console.error('❌ Error loading game state:', error);
+    } else {
+      console.error('❌ Error loading game state:', response.status);
+      
+      // 🔥 اگر خطای API بود، بازی جدید شروع کن
+      if (dailyPuzzle) {
+        await startNewGame(userId);
+      } else {
+        console.log('⏳ Waiting for puzzle before starting new game after API error...');
+        setTimeout(async () => {
+          if (dailyPuzzle) {
+            await startNewGame(userId);
+          }
+        }, 2000);
+      }
     }
-  };
+  } catch (error) {
+    console.error('❌ Error loading game state:', error);
+    
+    // 🔥 اگر خطای شبکه بود، بازی جدید شروع کن
+    if (dailyPuzzle) {
+      await startNewGame(userId);
+    } else {
+      console.log('⏳ Waiting for puzzle before starting new game after network error...');
+      setTimeout(async () => {
+        if (dailyPuzzle) {
+          await startNewGame(userId);
+        }
+      }, 2000);
+    }
+  }
+};
 
  const fetchUserStats = async (userId) => {
   try {
@@ -329,6 +367,33 @@ const startNewGame = async (userId) => {
   try {
     console.log('🎮 startNewGame called with userId:', userId);
     
+    // 🔥 بررسی وجود dailyPuzzle قبل از ارسال درخواست
+    if (!dailyPuzzle) {
+      console.log('❌ dailyPuzzle is not available, waiting...');
+      
+      // صبر کن و بعد از 2 ثانیه دوباره تلاش کن
+      setTimeout(async () => {
+        if (dailyPuzzle) {
+          console.log('🔄 Retrying game start now that puzzle is available');
+          await startNewGame(userId);
+        } else {
+          console.log('❌ Still no puzzle available after wait');
+        }
+      }, 2000);
+      return;
+    }
+
+    console.log('🔍 Game data check:', {
+      hasDailyPuzzle: !!dailyPuzzle,
+      puzzleSize: dailyPuzzle.size,
+      puzzleTitle: dailyPuzzle.title,
+      hasGrid: !!dailyPuzzle.grid,
+      hasSolution: !!dailyPuzzle.solution
+    });
+
+    // 🔥 تبدیل userId به string برای اطمینان
+    const stringUserId = String(userId);
+
     const response = await fetch('/api/game', {
       method: 'POST',
       headers: {
@@ -336,8 +401,10 @@ const startNewGame = async (userId) => {
       },
       body: JSON.stringify({
         action: 'start',
-        userId: userId,
-        gameData: { puzzle: dailyPuzzle }
+        userId: stringUserId, // 🔥 استفاده از stringUserId
+        gameData: { 
+          puzzle: dailyPuzzle 
+        }
       }),
     });
 
@@ -350,19 +417,40 @@ const startNewGame = async (userId) => {
       setMistakes(0);
       setInstantScore(0);
       
-      // 🆕 **تغییر این خط - اضافه کردن پارامتر resetTodayScore**
-      await updateUserScoreInDB(userId, 0, 0, true);
+      // 🔥 استفاده از stringUserId در اینجا هم
+      await updateUserScoreInDB(stringUserId, 0, 0, true);
       
-      const size = dailyPuzzle ? dailyPuzzle.size : 6;
+      const size = dailyPuzzle.size;
       setUserInput(Array(size).fill().map(() => Array(size).fill('')));
       setCellStatus(Array(size).fill().map(() => Array(size).fill('empty')));
       setSelectedCell([0, 0]);
       setGameCompleted(false);
       
       console.log('✅ Game state reset completed');
+    } else {
+      // 🔥 هندل کردن خطای HTTP
+      const errorData = await response.json();
+      console.error('❌ Error starting game - API response:', {
+        status: response.status,
+        error: errorData
+      });
+      
+      // 🔥 اگر خطای 400 یا 500 بود، بعد از 3 ثانیه دوباره تلاش کن
+      if (response.status >= 400) {
+        setTimeout(async () => {
+          console.log('🔄 Retrying game start after API error...');
+          await startNewGame(userId);
+        }, 3000);
+      }
     }
   } catch (error) {
     console.error('❌ Error starting game:', error);
+    
+    // 🔥 اگر خطای شبکه بود، بعد از 3 ثانیه دوباره تلاش کن
+    setTimeout(async () => {
+      console.log('🔄 Retrying game start after network error...');
+      await startNewGame(userId);
+    }, 3000);
   }
 };
 

@@ -25,6 +25,15 @@ const DailyChallengeLeaderboard = () => {
     }
   };
 
+  // تابع برای نمایش ایمن userId
+  const formatUserId = (userId) => {
+    if (!userId) return 'ناشناس';
+    
+    // تبدیل به string و سپس slice
+    const userIdStr = String(userId);
+    return userIdStr.length > 8 ? `${userIdStr.slice(0, 8)}...` : userIdStr;
+  };
+
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow-md p-6 text-center">
@@ -70,7 +79,8 @@ const DailyChallengeLeaderboard = () => {
                 {/* اطلاعات کاربر */}
                 <div>
                   <div className="font-bold text-gray-800">
-                    کاربر {user.userId.slice(0, 8)}...
+                    {/* 🔥 FIX: استفاده از تابع formatUserId به جای slice مستقیم */}
+                    کاربر {formatUserId(user.userId)}
                   </div>
                   <div className="text-sm text-gray-500">
                     {user.gamesPlayed} بازی
