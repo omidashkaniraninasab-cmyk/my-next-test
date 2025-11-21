@@ -512,28 +512,49 @@ const updateUserScoreInDB = async (userId, additionalScore, currentInstantScore,
   };
 
   const saveGameStateToServer = async (input, status, currentScore, currentMistakes) => {
-    try {
-      await fetch('/api/game/update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+  // اگر gameId نداریم، ذخیره نکنیم
+  if (!currentGameId) {
+    console.log('❌ No currentGameId, skipping save');
+    return;
+  }
+
+  try {
+    console.log('💾 SAVE GAME STATE - Calling API...', {
+      gameId: currentGameId,
+      score: currentScore,
+      mistakes: currentMistakes,
+      userId: currentUser?.id
+    });
+
+    const response = await fetch('/api/game/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        gameId: currentGameId,
+        userProgress: { 
+          userInput: input, 
+          cellStatus: status, 
+          selectedCell: selectedCell 
         },
-        body: JSON.stringify({
-          gameId: currentGameId,
-          userProgress: {
-            userInput: input,
-            cellStatus: status,
-            selectedCell: selectedCell
-          },
-          score: currentScore,
-          mistakes: currentMistakes,
-           userId: currentUser?.id  // 🆕 اضافه کردن userId
-        }),
-      });
-    } catch (error) {
-      console.error('Error saving game state:', error);
+        score: currentScore,
+        mistakes: currentMistakes,
+        userId: currentUser?.id
+      }),
+    });
+
+    const result = await response.json();
+    console.log('💾 SAVE RESPONSE:', result);
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to save game state');
     }
-  };
+    
+    console.log('✅ Game state saved successfully');
+    
+  } catch (error) {
+    console.error('❌ SAVE ERROR:', error);
+  }
+};
 
 // تابع handleInput - اصلاح شده
 const handleInput = async (char) => {
@@ -629,7 +650,7 @@ const handleInput = async (char) => {
 
   const updatedPerformance = calculateDailyPerformance();
   setDailyPerformance(updatedPerformance);
-
+console.log('💾 Calling saveGameStateToServer...');
   await saveGameStateToServer(newInput, newCellStatus, newTotalScore, mistakes + (isCorrect ? 0 : 1));
 
   if (!isCorrect) {
