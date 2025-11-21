@@ -16,6 +16,7 @@ const MemoryGameLeaderboard = () => {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('📊 داده‌های leaderboard:', data); // برای دیباگ
         setLeaderboard(data.leaderboard || []);
       }
     } catch (error) {
@@ -28,8 +29,6 @@ const MemoryGameLeaderboard = () => {
   // تابع برای نمایش ایمن userId
   const formatUserId = (userId) => {
     if (!userId) return 'ناشناس';
-    
-    // تبدیل به string و سپس slice
     const userIdStr = String(userId);
     return userIdStr.length > 8 ? `${userIdStr.slice(0, 8)}...` : userIdStr;
   };
@@ -79,8 +78,8 @@ const MemoryGameLeaderboard = () => {
                 {/* اطلاعات کاربر */}
                 <div>
                   <div className="font-bold text-gray-800">
-                    {/* 🔥 FIX: استفاده از تابع formatUserId به جای slice مستقیم */}
-                    کاربر {formatUserId(user.userId)}
+                    {/* 🔥 FIX: استفاده از displayName */}
+                    {user.displayName || formatUserId(user.userId)}
                   </div>
                   <div className="text-sm text-gray-500">
                     {user.gamesPlayed} بازی
@@ -91,7 +90,7 @@ const MemoryGameLeaderboard = () => {
               {/* امتیاز بازی حافظه */}
               <div className="text-left">
                 <div className="font-bold text-lg text-green-600">
-                  {user.totalScore}
+                  {user.totalScore} امتیاز
                 </div>
                 <div className="text-sm text-gray-500">
                   بهترین زمان: {user.bestTime} ثانیه

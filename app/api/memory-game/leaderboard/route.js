@@ -2,64 +2,70 @@ import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
 export async function GET() {
+  let result;
   try {
     console.log('🎮 دریافت رتبه‌بندی بازی حافظه...');
     
-    // گرفتن رتبه‌بندی از دیتابیس
-    const leaderboard = await sql`
+    // تست ساده‌ترین کوئری ممکن
+    console.log('🔍 اجرای کوئری تست...');
+    result = await sql`SELECT 1 as test`;
+    console.log('✅ تست دیتابیس موفق:', result);
+    
+    // کوئری اصلی
+    console.log('🔍 اجرای کوئری اصلی...');
+    result = await sql`
       SELECT 
         user_id,
-        total_score,
-        today_score,
-        games_played,
-        best_time,
-        created_at
+        username,
+        display_name,
+        total_score
       FROM memory_game_scores 
-      ORDER BY total_score DESC, best_time ASC
-      LIMIT 50
+      LIMIT 5
     `;
     
-    // 🔥 FIX: تبدیل userId به string برای جلوگیری از خطای slice
-    const leaderboardWithRanks = leaderboard.map((user, index) => ({
+    console.log('📊 نتیجه کوئری اصلی:', {
+      length: result?.length,
+      data: result
+    });
+    
+    if (!result || result.length === 0) {
+      console.log('ℹ️ هیچ داده‌ای پیدا نشد');
+      return NextResponse.json({ 
+        success: true,
+        leaderboard: [],
+        debug: 'no_data_found'
+      });
+    }
+    
+    // تبدیل ساده
+    const leaderboard = result.map((user, index) => ({
       rank: index + 1,
-      userId: String(user.user_id), // تبدیل اجباری به string
-      totalScore: user.total_score || 0,
-      gamesPlayed: user.games_played || 0,
-      todayScore: user.today_score || 0,
-      bestTime: user.best_time || 0,
-      joinedDate: user.created_at
+      userId: String(user.user_id),
+      username: user.username || 'user',
+      displayName: user.display_name || 'کاربر',
+      totalScore: user.total_score || 0
     }));
     
-    // تعداد کل بازیکنان
-    const totalPlayersResult = await sql`
-      SELECT COUNT(*) as count FROM memory_game_scores
-    `;
-    const totalPlayers = totalPlayersResult[0]?.count || 0;
-    
-    console.log('✅ رتبه‌بندی بازی حافظه دریافت شد:', { 
-      totalPlayers, 
-      topPlayers: leaderboard.length 
-    });
+    console.log('✅ لیست نهایی:', leaderboard);
     
     return NextResponse.json({
       success: true,
-      leaderboard: leaderboardWithRanks,
-      gameType: 'memory-game',
-      totalPlayers,
-      updatedAt: new Date().toISOString()
+      leaderboard: leaderboard,
+      debug: 'success'
     });
     
   } catch (error) {
-    console.error('❌ خطا در دریافت رتبه‌بندی بازی حافظه:', error);
+    console.error('❌ خطای کامل:', error);
+    console.error('🔍 جزئیات خطا:', {
+      message: error.message,
+      stack: error.stack
+    });
     
-    // 🔥 برگرداندن داده‌های نمونه در صورت خطا
     return NextResponse.json({ 
       success: true,
       leaderboard: [],
-      gameType: 'memory-game',
-      totalPlayers: 0,
-      updatedAt: new Date().toISOString(),
-      error: 'خطای موقت در دریافت داده‌ها'
+      debug: 'error',
+      error: error.message
     });
   }
 }
