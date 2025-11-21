@@ -526,7 +526,8 @@ const updateUserScoreInDB = async (userId, additionalScore, currentInstantScore,
             selectedCell: selectedCell
           },
           score: currentScore,
-          mistakes: currentMistakes
+          mistakes: currentMistakes,
+           userId: currentUser?.id  // 🆕 اضافه کردن userId
         }),
       });
     } catch (error) {
@@ -709,7 +710,7 @@ const checkGameCompletion = async () => {
   
   for (let i = 0; i < dailyPuzzle.size; i++) {
     for (let j = 0; j < dailyPuzzle.size; j++) {
-      if (dailyPuzzle.grid[i][j] === 1 && cellStatus[i][j] !== 'locked') {
+      if (dailyPuzzle.grid[i][j] === 1 && cellStatus[i]?.[j] !== 'locked') {
         allLocked = false;
         break;
       }
@@ -750,6 +751,8 @@ const checkGameCompletion = async () => {
       });
 
       if (!scoreResponse.ok) {
+        const errorText = await scoreResponse.text();
+        console.error('❌ Score update failed:', errorText);
         throw new Error('Failed to add bonus score');
       }
 
@@ -760,7 +763,7 @@ const checkGameCompletion = async () => {
       
       // 3. تکمیل بازی
       console.log('🏁 Marking game as completed...');
-      await fetch('/api/game/complete', {
+      const completeResponse = await fetch('/api/game/complete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -772,62 +775,96 @@ const checkGameCompletion = async () => {
         }),
       });
 
-      // 4. XP
-      console.log('⭐ Adding XP for game completion...');
-      await fetch('/api/user/level', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: currentUser.id,
-          xp: 100,
-          reason: 'اتمام بازی کراسورد'
-        })
-      });
-
-      // 5. ذخیره تاریخچه
-      console.log('💾 Saving game to history...');
-      
-      const usersResponse = await fetch('/api/users');
-      if (usersResponse.ok) {
-        const usersData = await usersResponse.json();
-        const updatedUser = usersData.find(user => user.id === currentUser.id);
-        
-        if (updatedUser) {
-          const finalTodayScore = updatedUser.today_crossword_score;
-          
-          console.log('🔍 Final today score from database:', finalTodayScore);
-          
-          const historyResponse = await fetch('/api/game/save-history', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              userId: currentUser.id,
-              gameId: currentGameId,
-              puzzleData: dailyPuzzle,
-              mistakes: mistakes,
-              todayScore: finalTodayScore
-            }),
-          });
-
-          if (historyResponse.ok) {
-            console.log('✅ History saved with final score:', finalTodayScore);
-            
-            await fetchUserStats(currentUser.id);
-            await fetchUsers();
-            setGameHistoryKey(prev => prev + 1);
-            
-            console.log('🔄 GameHistory component forced to update');
-          }
-        }
+      if (!completeResponse.ok) {
+        console.warn('⚠️ Game complete API returned non-200 status:', completeResponse.status);
+      } else {
+        console.log('✅ Game marked as completed');
       }
 
+      // 4. XP
+      console.log('⭐ Adding XP for game completion...');
+      try {
+        const xpResponse = await fetch('/api/user/level', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            xp: 100,
+            reason: 'اتمام بازی کراسورد'
+          })
+        });
+        
+        if (!xpResponse.ok) {
+          console.warn('⚠️ XP API returned non-200 status:', xpResponse.status);
+        } else {
+          console.log('✅ XP added successfully');
+        }
+      } catch (xpError) {
+        console.warn('⚠️ XP addition failed, but continuing:', xpError.message);
+      }
+
+      // 5. ذخیره تاریخچه - با هندلینگ خطا
+      console.log('💾 Saving game to history...');
+      
+      try {
+        const usersResponse = await fetch('/api/users');
+        if (usersResponse.ok) {
+          const usersData = await usersResponse.json();
+          const updatedUser = usersData.find(user => user.id === currentUser.id);
+          
+          if (updatedUser) {
+            const finalTodayScore = updatedUser.today_crossword_score;
+            
+            console.log('🔍 Final today score from database:', finalTodayScore);
+            
+            const historyResponse = await fetch('/api/game/save-history', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                userId: currentUser.id,
+                gameId: currentGameId,
+                puzzleData: dailyPuzzle,
+                mistakes: mistakes,
+                todayScore: finalTodayScore
+              }),
+            });
+
+            if (historyResponse.ok) {
+              console.log('✅ History saved with final score:', finalTodayScore);
+            } else {
+              console.warn('⚠️ History save returned non-200 status:', historyResponse.status);
+              // تلاش برای گرفتن پیام خطا
+              try {
+                const errorData = await historyResponse.json();
+                console.warn('⚠️ History save error details:', errorData);
+              } catch (e) {
+                console.warn('⚠️ Could not parse history error response');
+              }
+            }
+          }
+        } else {
+          console.warn('⚠️ Could not fetch users for history');
+        }
+      } catch (historyError) {
+        console.warn('⚠️ History save failed, but continuing:', historyError.message);
+        // ادامه بده حتی اگر تاریخچه ذخیره نشد
+      }
+
+      // 6. آپدیت نهایی وضعیت
+      await fetchUserStats(currentUser.id);
+      await fetchUsers();
+      setGameHistoryKey(prev => prev + 1);
+      
       console.log('🎉 Game completion process finished!');
 
     } catch (error) {
-      console.error('❌ Error in game completion process:', error);
+      console.error('❌ Critical error in game completion process:', error);
       completionCheckedRef.current = false;
+      
+      // نمایش پیام به کاربر
+      alert('خطایی در تکمیل بازی رخ داد. بازی تکمیل شده اما ممکن است برخی اطلاعات ذخیره نشده باشند.');
     }
   }
 };
