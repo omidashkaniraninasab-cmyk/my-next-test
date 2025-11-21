@@ -8,15 +8,23 @@ export async function POST(request) {
     const { action, userId, gameData, userProgress, gameId } = await request.json();
     
     console.log('Game API called:', { action, userId, gameId });
- console.log('🔍 Game data received:', {
+    console.log('🔍 Game data received:', {
       hasGameData: !!gameData,
       hasPuzzle: !!gameData?.puzzle,
       puzzleKeys: gameData?.puzzle ? Object.keys(gameData.puzzle) : 'no puzzle'
     });
+
     if (action === 'start') {
-      const game = await createNewGame(userId, gameData);
-       console.log('✅ Game creation successful');
+      // 🚨 مشکل اینجاست! باید gameData.puzzle رو پاس بدیم نه gameData
+      if (!gameData?.puzzle) {
+        console.log('❌ Missing puzzle data in gameData');
+        return Response.json({ error: 'Puzzle data is required' }, { status: 400 });
+      }
+      
+      const game = await createNewGame(userId, gameData.puzzle);  // 🆕 این خط رو اصلاح کنید
+      console.log('✅ Game creation successful');
       return Response.json({ success: true, game: game });
+      
     } else if (action === 'first-input') {
       console.log('🎯 first-input called with:', { gameId, userId });
       
@@ -48,7 +56,7 @@ export async function POST(request) {
     
   } catch (error) {
     console.error('Game API error:', error);
-      console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error stack:', error.stack);
     return Response.json({ error: error.message }, { status: 500 });
   }
 }
