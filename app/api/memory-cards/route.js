@@ -75,11 +75,25 @@ export async function POST(request) {
         error: 'داده‌های ناقص' 
       }, { status: 400 });
     }
+
+    // 🔥 گرفتن اطلاعات کاربر برای فیلدهای جدید
+    const userInfo = await sql`
+      SELECT username, user_code, first_name, last_name 
+      FROM user_profiles 
+      WHERE id = ${userId}
+    `;
     
-    // ذخیره در تاریخچه بازی
+    const user = userInfo[0];
+    const username = user?.username || `user_${userId}`;
+    const userCode = user?.user_code || `UC${userId}`;
+    const displayName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'کاربر';
+    
+    // 🔥 ذخیره در تاریخچه بازی با فیلدهای جدید
     await sql`
-      INSERT INTO memory_game_history (user_id, level, moves, score, time_spent)
-      VALUES (${userId}, ${level}, ${moves}, ${score}, ${timeSpent || 0})
+      INSERT INTO memory_game_history 
+        (user_id, level, moves, score, time_spent, username, user_code, display_name)
+      VALUES 
+        (${userId}, ${level}, ${moves}, ${score}, ${timeSpent || 0}, ${username}, ${userCode}, ${displayName})
     `;
     
     // آپدیت یا ایجاد امتیاز کاربر
@@ -89,9 +103,7 @@ export async function POST(request) {
     `;
     
     if (existingScores.length > 0) {
-      // آپدیت امتیاز موجود
-      const userData = existingScores[0];
-      
+      // 🔥 آپدیت امتیاز موجود با فیلدهای جدید
       await sql`
         UPDATE memory_game_scores 
         SET 
@@ -99,15 +111,20 @@ export async function POST(request) {
           total_score = total_score + ${score},
           best_score = GREATEST(best_score, ${score}),
           best_moves = LEAST(best_moves, ${moves}),
+          username = ${username},
+          user_code = ${userCode},
+          display_name = ${displayName},
           updated_at = CURRENT_TIMESTAMP
         WHERE user_id = ${userId} AND level = ${level}
       `;
       console.log('✅ امتیاز کاربر آپدیت شد');
     } else {
-      // ایجاد امتیاز جدید
+      // 🔥 ایجاد امتیاز جدید با فیلدهای جدید
       await sql`
-        INSERT INTO memory_game_scores (user_id, level, best_score, best_moves, games_played, total_score)
-        VALUES (${userId}, ${level}, ${score}, ${moves}, 1, ${score})
+        INSERT INTO memory_game_scores 
+          (user_id, level, best_score, best_moves, games_played, total_score, username, user_code, display_name)
+        VALUES 
+          (${userId}, ${level}, ${score}, ${moves}, 1, ${score}, ${username}, ${userCode}, ${displayName})
       `;
       console.log('✅ امتیاز جدید کاربر ایجاد شد');
     }
