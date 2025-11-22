@@ -2,70 +2,59 @@ import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
 export async function GET() {
-  let result;
   try {
-    console.log('🎮 دریافت رتبه‌بندی بازی حافظه...');
+    console.log('🏆 دریافت رتبه‌بندی بازی کارت...');
     
-    // تست ساده‌ترین کوئری ممکن
-    console.log('🔍 اجرای کوئری تست...');
-    result = await sql`SELECT 1 as test`;
-    console.log('✅ تست دیتابیس موفق:', result);
-    
-    // کوئری اصلی
-    console.log('🔍 اجرای کوئری اصلی...');
-    result = await sql`
-      SELECT 
-        user_id,
-        username,
-        display_name,
-        total_score
+    // اول فقط user_id و display_name رو بگیریم
+    const testQuery = await sql`
+      SELECT user_id, display_name
       FROM memory_game_scores 
       LIMIT 5
     `;
     
-    console.log('📊 نتیجه کوئری اصلی:', {
-      length: result?.length,
-      data: result
-    });
+    console.log('🔍 تست فیلد display_name:', testQuery);
     
-    if (!result || result.length === 0) {
-      console.log('ℹ️ هیچ داده‌ای پیدا نشد');
-      return NextResponse.json({ 
-        success: true,
-        leaderboard: [],
-        debug: 'no_data_found'
-      });
-    }
+    // اگر تست کار کرد، کل query رو اجرا کنیم
+    const leaderboard = await sql`
+      SELECT 
+        user_id,
+        display_name,
+        level,
+        best_score,
+        best_moves,
+        games_played,
+        total_score
+      FROM memory_game_scores 
+      WHERE best_score > 0
+      ORDER BY best_score DESC, best_moves ASC
+      LIMIT 50
+    `;
     
-    // تبدیل ساده
-    const leaderboard = result.map((user, index) => ({
+    console.log('📊 داده‌های دریافت شده:', leaderboard);
+    
+    const leaderboardWithRanks = leaderboard.map((user, index) => ({
       rank: index + 1,
-      userId: String(user.user_id),
-      username: user.username || 'user',
-      displayName: user.display_name || 'کاربر',
-      totalScore: user.total_score || 0
+      userId: user.user_id,
+      displayName: user.display_name || `User${user.user_id}`,
+      level: user.level,
+      bestScore: user.best_score,
+      bestMoves: user.best_moves,
+      gamesPlayed: user.games_played,
+      totalScore: user.total_score,
+      bestTime: user.best_moves
     }));
-    
-    console.log('✅ لیست نهایی:', leaderboard);
     
     return NextResponse.json({
       success: true,
-      leaderboard: leaderboard,
-      debug: 'success'
+      leaderboard: leaderboardWithRanks
     });
     
   } catch (error) {
-    console.error('❌ خطای کامل:', error);
-    console.error('🔍 جزئیات خطا:', {
-      message: error.message,
-      stack: error.stack
-    });
-    
+    console.error('❌ خطا در دریافت رتبه‌بندی:', error);
+    console.error('📌 جزئیات خطا:', error.message);
     return NextResponse.json({ 
-      success: true,
-      leaderboard: [],
-      debug: 'error',
-      error: error.message
-    });
+      success: false, 
+      error: 'خطای سرور در دریافت رتبه‌بندی' 
+    }, { status: 500 });
   }
 }

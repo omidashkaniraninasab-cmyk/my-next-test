@@ -80,7 +80,7 @@ const DailyChallengeLeaderboard = () => {
                 <div>
                   <div className="font-bold text-gray-800">
                     {/* 🔥 FIX: استفاده از تابع formatUserId به جای slice مستقیم */}
-                    کاربر {formatUserId(user.userId)}
+                     {user.displayName ? user.displayName : `کاربر ${formatUserId(user.userId)}`}
                   </div>
                   <div className="text-sm text-gray-500">
                     {user.gamesPlayed} بازی

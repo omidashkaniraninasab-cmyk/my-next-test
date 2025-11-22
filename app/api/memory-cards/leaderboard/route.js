@@ -5,7 +5,6 @@ export async function GET() {
   try {
     console.log('🏆 دریافت رتبه‌بندی بازی کارت...');
     
-    // گرفتن رتبه‌بندی از دیتابیس
     const leaderboard = await sql`
       SELECT 
         user_id,
@@ -21,23 +20,25 @@ export async function GET() {
       LIMIT 50
     `;
     
-    console.log(`✅ ${leaderboard.length} کاربر در رتبه‌بندی`);
-    
     const leaderboardWithRanks = leaderboard.map((user, index) => ({
       rank: index + 1,
       userId: user.user_id,
+      displayName: `User${user.user_id}`, // نمایش ساده
       level: user.level,
       bestScore: user.best_score,
       bestMoves: user.best_moves,
       gamesPlayed: user.games_played,
-      totalScore: user.total_score
+      totalScore: user.total_score,
+      bestTime: user.best_moves
     }));
+    
+    console.log(`✅ ${leaderboardWithRanks.length} کاربر در رتبه‌بندی`);
     
     return NextResponse.json({
       success: true,
       leaderboard: leaderboardWithRanks,
       gameType: 'memory-cards',
-      totalPlayers: leaderboard.length,
+      totalPlayers: leaderboardWithRanks.length,
       updatedAt: new Date().toISOString()
     });
     

@@ -5,60 +5,46 @@ export async function GET() {
   try {
     console.log('🎯 دریافت رتبه‌بندی چالش...');
     
-    // گرفتن رتبه‌بندی از دیتابیس
+    // گرفتن ALL فیلدها از جدول
     const leaderboard = await sql`
       SELECT 
         user_id,
+        username,
+        user_code,
+        display_name,
         total_score,
         today_score,
-        games_played,
-        created_at
+        games_played
       FROM daily_challenge_scores 
-      ORDER BY total_score DESC, created_at ASC
+      ORDER BY total_score DESC
       LIMIT 50
     `;
     
-    // 🔥 FIX: تبدیل userId به string برای جلوگیری از خطای slice
+    console.log('🔍 اولین کاربر:', leaderboard[0]);
+    
     const leaderboardWithRanks = leaderboard.map((user, index) => ({
       rank: index + 1,
-      userId: String(user.user_id), // تبدیل اجباری به string
+      userId: String(user.user_id),
+      displayName: user.display_name, // استفاده از display_name واقعی
+      username: user.username,
+      userCode: user.user_code,
       totalScore: user.total_score || 0,
       gamesPlayed: user.games_played || 0,
-      todayScore: user.today_score || 0,
-      joinedDate: user.created_at
+      todayScore: user.today_score || 0
     }));
-    
-    // تعداد کل بازیکنان
-    const totalPlayersResult = await sql`
-      SELECT COUNT(*) as count FROM daily_challenge_scores
-    `;
-    const totalPlayers = totalPlayersResult[0]?.count || 0;
-    
-    console.log('✅ رتبه‌بندی دریافت شد:', { 
-      totalPlayers, 
-      topPlayers: leaderboard.length,
-      sampleUser: leaderboardWithRanks[0] // برای دیباگ
-    });
     
     return NextResponse.json({
       success: true,
       leaderboard: leaderboardWithRanks,
-      gameType: 'daily-challenge',
-      totalPlayers,
-      updatedAt: new Date().toISOString()
+      totalPlayers: leaderboard.length
     });
     
   } catch (error) {
     console.error('❌ خطا در دریافت رتبه‌بندی:', error);
-    
-    // 🔥 برگرداندن داده‌های نمونه در صورت خطا
     return NextResponse.json({ 
-      success: true, // true بگذارید تا frontend crash نکند
+      success: true,
       leaderboard: [],
-      gameType: 'daily-challenge',
-      totalPlayers: 0,
-      updatedAt: new Date().toISOString(),
-      error: 'خطای موقت در دریافت داده‌ها'
+      error: error.message
     });
   }
 }
