@@ -15,6 +15,8 @@ const DailyChallenge = ({ currentUser }) => {
     challengeCompleted,
     loading,
     challengeStats,
+    gameStarted, // اضافه شده
+    startNewChallenge, // اضافه شده
     submitAnswer,
     resetChallenge
   } = useDailyChallenge(currentUser);
@@ -82,12 +84,51 @@ const DailyChallenge = ({ currentUser }) => {
                   <p className="text-yellow-600">لطفاً ابتدا وارد حساب کاربری خود شوید</p>
                 </div>
               </div>
+            ) : !gameStarted && !currentQuestion ? (
+              // حالت اول: بازی شروع نشده - نمایش دکمه شروع
+              <div className="text-center py-8 space-y-6">
+                <div className="bg-white rounded-lg p-8 shadow-md border-2 border-green-300">
+                  <h3 className="text-2xl font-bold text-green-800 mb-4">🎮 چالش روزانه</h3>
+                  <p className="text-gray-600 mb-6">آماده‌اید؟ با زدن دکمه زیر چالش ۱۵ ثانیه‌ای رو شروع کنید!</p>
+                  
+                  <button 
+                    onClick={startNewChallenge}
+                    disabled={loading}
+                    className={`px-8 py-4 rounded-lg font-bold text-xl transition-all duration-300 shadow-lg hover:shadow-xl ${
+                      loading 
+                        ? 'bg-gray-400 cursor-not-allowed' 
+                        : 'bg-green-500 hover:bg-green-600 text-white transform hover:scale-105'
+                    }`}
+                  >
+                    {loading ? (
+                      <span className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-2"></div>
+                        در حال بارگذاری...
+                      </span>
+                    ) : (
+                      '🚀 شروع چالش جدید'
+                    )}
+                  </button>
+                  
+                  <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                    <h4 className="font-bold text-blue-800 mb-2">📋 نحوه بازی:</h4>
+                    <ul className="text-sm text-gray-700 text-right space-y-1">
+                      <li>• پس از شروع، ۱۵ ثانیه زمان دارید</li>
+                      <li>• به سوال نمایش داده شده پاسخ دهید</li>
+                      <li>• امتیاز بر اساس تعداد کاربران با پاسخ مشابه محاسبه می‌شود</li>
+                      <li>• پاسخ‌های منحصر به فرد امتیاز بیشتری می‌گیرند</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             ) : !currentQuestion ? (
+              // حالت دوم: در حال بارگذاری سوال
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto"></div>
                 <p className="mt-4 text-gray-600">در حال بارگذاری چالش روزانه...</p>
               </div>
             ) : (
+              // حالت سوم: بازی در حال اجرا یا تمام شده
               <>
                 {/* سوال و تایمر */}
                 <div className="text-center mb-6">
@@ -112,16 +153,16 @@ const DailyChallenge = ({ currentUser }) => {
                     />
                     <br />
                     <button 
-  onClick={(e) => submitAnswer(e)} // e رو پاس بده
-  disabled={loading}
-  className={`px-8 py-3 rounded-lg font-bold text-lg transition-all duration-300 shadow-md hover:shadow-lg ${
-    loading 
-      ? 'bg-gray-400 cursor-not-allowed' 
-      : 'bg-green-500 hover:bg-green-600 text-white'
-  }`}
->
-  {loading ? '⏳ در حال ثبت...' : '🚀 ارسال پاسخ'}
-</button>
+                      onClick={(e) => submitAnswer(e)}
+                      disabled={loading}
+                      className={`px-8 py-3 rounded-lg font-bold text-lg transition-all duration-300 shadow-md hover:shadow-lg ${
+                        loading 
+                          ? 'bg-gray-400 cursor-not-allowed' 
+                          : 'bg-green-500 hover:bg-green-600 text-white'
+                      }`}
+                    >
+                      {loading ? '⏳ در حال ثبت...' : '🚀 ارسال پاسخ'}
+                    </button>
                   </div>
                 )}
 
@@ -157,7 +198,7 @@ const DailyChallenge = ({ currentUser }) => {
                     )}
 
                     <button 
-                      onClick={resetChallenge}
+                      onClick={startNewChallenge} // تغییر از resetChallenge به startNewChallenge
                       className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-bold transition-all duration-300"
                     >
                       🔄 چالش جدید
