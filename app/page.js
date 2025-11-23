@@ -248,10 +248,22 @@ const loadDailyPuzzle = async () => {
       if (gameState && gameState.userProgress) {
         console.log('✅ Setting game state from server');
         
-        const size = dailyPuzzle ? dailyPuzzle.size : 6;
+        // 🔥 صبر کن تا dailyPuzzle آماده بشه
+        let puzzleSize = 6; // مقدار پیش‌فرض
         
-        const defaultUserInput = Array(size).fill().map(() => Array(size).fill(''));
-        const defaultCellStatus = Array(size).fill().map(() => Array(size).fill('empty'));
+        if (dailyPuzzle) {
+          puzzleSize = dailyPuzzle.size;
+        } else {
+          console.log('⏳ Waiting for dailyPuzzle to get size...');
+          // اگر dailyPuzzle هنوز null هست، 1 ثانیه صبر کن
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          if (dailyPuzzle) {
+            puzzleSize = dailyPuzzle.size;
+          }
+        }
+        
+        const defaultUserInput = Array(puzzleSize).fill().map(() => Array(puzzleSize).fill(''));
+        const defaultCellStatus = Array(puzzleSize).fill().map(() => Array(puzzleSize).fill('empty'));
         
         setUserInput(gameState.userProgress.userInput || defaultUserInput);
         setCellStatus(gameState.userProgress.cellStatus || defaultCellStatus);
@@ -261,21 +273,17 @@ const loadDailyPuzzle = async () => {
         setGameCompleted(gameState.completed || false);
         setCurrentGameId(gameState.id);
         
-        console.log('🎮 Game state loaded successfully');
+        console.log('🎮 Game state loaded successfully - Size:', puzzleSize);
       } else {
         console.log('🆕 No active game found, starting new game');
         
-        // 🔥 صبر کن تا dailyPuzzle آماده شود قبل از شروع بازی جدید
         if (dailyPuzzle) {
           await startNewGame(userId);
         } else {
           console.log('⏳ Waiting for dailyPuzzle before starting new game...');
-          // بعد از 2 ثانیه چک کن
           setTimeout(async () => {
             if (dailyPuzzle) {
               await startNewGame(userId);
-            } else {
-              console.log('❌ Still no puzzle available, cannot start game');
             }
           }, 2000);
         }
@@ -283,7 +291,6 @@ const loadDailyPuzzle = async () => {
     } else {
       console.error('❌ Error loading game state:', response.status);
       
-      // 🔥 اگر خطای API بود، بازی جدید شروع کن
       if (dailyPuzzle) {
         await startNewGame(userId);
       } else {
@@ -298,7 +305,6 @@ const loadDailyPuzzle = async () => {
   } catch (error) {
     console.error('❌ Error loading game state:', error);
     
-    // 🔥 اگر خطای شبکه بود، بازی جدید شروع کن
     if (dailyPuzzle) {
       await startNewGame(userId);
     } else {
@@ -312,7 +318,7 @@ const loadDailyPuzzle = async () => {
   }
 };
 
- const fetchUserStats = async (userId) => {
+const fetchUserStats = async (userId) => {
   try {
     console.log('🔄 Fetching user stats for:', userId);
     
@@ -329,17 +335,13 @@ const loadDailyPuzzle = async () => {
           games: currentUserData.crossword_games_played
         });
         
-        // 🆕 **فقط اگر داده واقعاً تغییر کرده باشه، state رو آپدیت کن**
-        setCurrentUser(prevUser => {
-          if (prevUser && 
-              prevUser.total_crossword_score === currentUserData.total_crossword_score &&
-              prevUser.today_crossword_score === currentUserData.today_crossword_score) {
-            console.log('🔄 No changes in user stats, skipping update');
-            return prevUser;
-          }
-          console.log('✅ User stats updated');
-          return currentUserData;
-        });
+        console.log('🔍 BEFORE - currentUser total:', currentUser?.total_crossword_score);
+        console.log('🔍 NEW - API total:', currentUserData.total_crossword_score);
+        
+        // 🔥 همیشه آپدیت کن - بررسی شرط رو حذف کن
+        setCurrentUser(currentUserData);
+        console.log('✅ User stats updated - forced');
+        
       } else {
         console.log('❌ User not found in user list');
       }
