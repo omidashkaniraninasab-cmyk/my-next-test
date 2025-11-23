@@ -157,11 +157,19 @@ useEffect(() => {
     
     if (user) {
       console.log('✅ Session restored successfully:', user.id);
-      setCurrentUser(user);
+      
+      // 🔥 اول اطلاعات کامل کاربر رو از API بگیر
+      const fullUserData = await fetchUserStatsImmediately(user.id);
+      
+      // 🔥 سپس با داده‌های کامل set کن
+      if (fullUserData) {
+        setCurrentUser(fullUserData);
+      } else {
+        setCurrentUser(user); // fallback به session
+      }
       
       await updateLoginTime(user.id);
-      await fetchUserStats(user.id);
-      await checkGameStatus(user.id); // 🆕 حالا درسته
+      await checkGameStatus(user.id);
       await loadUserGameState(user.id);
       await loadDailyPuzzle();
       
@@ -180,6 +188,31 @@ useEffect(() => {
   }
 };
 
+// 🔥 تابع جدید برای گرفتن فوری اطلاعات کاربر
+const fetchUserStatsImmediately = async (userId) => {
+  try {
+    console.log('🚀 Fetching user stats immediately for:', userId);
+    
+    const response = await fetch('/api/users');
+    if (response.ok) {
+      const userData = await response.json();
+      const currentUserData = userData.find(user => user.id === userId);
+      
+      if (currentUserData) {
+        console.log('📊 Immediate user stats loaded:', {
+          id: currentUserData.id,
+          total: currentUserData.total_crossword_score,
+          today: currentUserData.today_crossword_score
+        });
+        return currentUserData;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('❌ Immediate fetch error:', error);
+    return null;
+  }
+};
 
   
 
@@ -320,12 +353,16 @@ const loadDailyPuzzle = async () => {
 
 const fetchUserStats = async (userId) => {
   try {
-    console.log('🔄 Fetching user stats for:', userId);
+    console.log('🔄 Fetching user stats for:', userId, 'Type:', typeof userId);
     
     const response = await fetch('/api/users');
     if (response.ok) {
       const userData = await response.json();
-      const currentUserData = userData.find(user => user.id === userId);
+      console.log('👥 All users from API:', userData.map(u => ({ id: u.id, type: typeof u.id, username: u.username })));
+      
+      // 🔥 تبدیل userId به number برای مقایسه
+      const numericUserId = parseInt(userId);
+      const currentUserData = userData.find(user => user.id === numericUserId);
       
       if (currentUserData) {
         console.log('📊 User stats loaded:', {
@@ -335,15 +372,11 @@ const fetchUserStats = async (userId) => {
           games: currentUserData.crossword_games_played
         });
         
-        console.log('🔍 BEFORE - currentUser total:', currentUser?.total_crossword_score);
-        console.log('🔍 NEW - API total:', currentUserData.total_crossword_score);
-        
-        // 🔥 همیشه آپدیت کن - بررسی شرط رو حذف کن
         setCurrentUser(currentUserData);
-        console.log('✅ User stats updated - forced');
-        
+        console.log('✅ User stats updated');
       } else {
-        console.log('❌ User not found in user list');
+        console.log('❌ User not found. Looking for:', numericUserId, 'Type:', typeof numericUserId);
+        console.log('Available users:', userData.map(u => u.id));
       }
     } else {
       console.error('❌ Error fetching users:', response.status);
