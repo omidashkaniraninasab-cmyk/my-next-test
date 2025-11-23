@@ -857,7 +857,9 @@ const checkGameCompletion = async () => {
   if (allLocked) {
     console.log('🎯 Game completed! Setting completion state...');
     
-    completionCheckedRef.current = true;
+    // 🔥 این خط رو حذف کنید یا بعد از موفقیت قرار بدید
+    // completionCheckedRef.current = true;
+    
     setGameCompleted(true);
     setTodayGameCompleted(true);
     setInstantScore(0);
@@ -899,22 +901,32 @@ const checkGameCompletion = async () => {
       
       // 3. تکمیل بازی
       console.log('🏁 Marking game as completed...');
-      const completeResponse = await fetch('/api/games/crossword/game/complete', {
+      const completeResponse = await fetch('/api/games/crossword', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          action: 'complete',
           gameId: currentGameId,
-          finalScore: currentUser.today_crossword_score + bonusScore,
-          userId: currentUser.id
+          userId: currentUser.id,
+          score: currentUser.today_crossword_score + bonusScore,
+          mistakes: mistakes
         }),
       });
 
       if (!completeResponse.ok) {
         console.warn('⚠️ Game complete API returned non-200 status:', completeResponse.status);
+        
+        try {
+          const errorData = await completeResponse.json();
+          console.warn('⚠️ Game complete error details:', errorData);
+        } catch (e) {
+          console.warn('⚠️ Could not parse complete error response');
+        }
       } else {
-        console.log('✅ Game marked as completed');
+        const completeData = await completeResponse.json();
+        console.log('✅ Game marked as completed:', completeData);
       }
 
       // 4. XP
@@ -939,7 +951,7 @@ const checkGameCompletion = async () => {
         console.warn('⚠️ XP addition failed, but continuing:', xpError.message);
       }
 
-      // 5. ذخیره تاریخچه - با هندلینگ خطا
+      // 5. ذخیره تاریخچه
       console.log('💾 Saving game to history...');
       
       try {
@@ -971,36 +983,33 @@ const checkGameCompletion = async () => {
               console.log('✅ History saved with final score:', finalTodayScore);
             } else {
               console.warn('⚠️ History save returned non-200 status:', historyResponse.status);
-              // تلاش برای گرفتن پیام خطا
-              try {
-                const errorData = await historyResponse.json();
-                console.warn('⚠️ History save error details:', errorData);
-              } catch (e) {
-                console.warn('⚠️ Could not parse history error response');
-              }
             }
           }
-        } else {
-          console.warn('⚠️ Could not fetch users for history');
         }
       } catch (historyError) {
         console.warn('⚠️ History save failed, but continuing:', historyError.message);
-        // ادامه بده حتی اگر تاریخچه ذخیره نشد
       }
 
-      // 6. آپدیت نهایی وضعیت
+      // 6. آپدیت نهایی وضعیت و نمایش پیام
       await fetchUserStats(currentUser.id);
       await fetchUsers();
       setGameHistoryKey(prev => prev + 1);
       
+      // 🔥 فقط اینجا completionChecked رو true کن
+      completionCheckedRef.current = true;
+      
       console.log('🎉 Game completion process finished!');
+      
+      // 🔥 نمایش پیام تبریک به کاربر
+      alert(`🎉 بازی تکمیل شد! امتیاز نهایی شما: ${currentUser.today_crossword_score + bonusScore}`);
 
     } catch (error) {
       console.error('❌ Critical error in game completion process:', error);
+      // 🔥 در صورت خطا، completionChecked رو false کن تا دوباره چک بشه
       completionCheckedRef.current = false;
+      setGameCompleted(false);
       
-      // نمایش پیام به کاربر
-      alert('خطایی در تکمیل بازی رخ داد. بازی تکمیل شده اما ممکن است برخی اطلاعات ذخیره نشده باشند.');
+      alert('خطایی در تکمیل بازی رخ داد. لطفاً دوباره تلاش کنید.');
     }
   }
 };
