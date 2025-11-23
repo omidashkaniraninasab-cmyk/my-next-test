@@ -219,28 +219,20 @@ const fetchUserStatsImmediately = async (userId) => {
 const loadDailyPuzzle = async () => {
   try {
     setPuzzleLoading(true);
-    console.log('🎯 Loading daily puzzle...');
+    console.log('🎯 Loading monthly puzzle...');
     
-    // اول از monthly-puzzles سعی کن
-    const monthlyResponse = await fetch('/api/monthly-puzzles');
+    // 🔥 فقط از monthly استفاده کن - دیگه fallback به daily نداشته باش
+    const monthlyResponse = await fetch('/api/games/crossword/puzzles/monthly');
     
     if (monthlyResponse.ok) {
       const monthlyData = await monthlyResponse.json();
-      console.log('✅ Monthly puzzle loaded:', monthlyData.date);
+      console.log('✅ Monthly puzzle loaded:', monthlyData.iran_date);
       setDailyPuzzle(monthlyData.puzzle_data);
-    } else if (monthlyResponse.status === 404) {
-      // اگر پیدا نکرد، از سیستم قدیمی استفاده کن
-      console.log('📅 No monthly puzzle, using legacy system...');
-      const legacyResponse = await fetch('/api/daily-puzzle');
-      
-      if (legacyResponse.ok) {
-        const legacyData = await legacyResponse.json();
-        setDailyPuzzle(legacyData);
-      } else {
-        throw new Error('Failed to load puzzle');
-      }
     } else {
-      throw new Error('Monthly puzzles API error');
+      console.log('❌ Monthly puzzle not available');
+      // Fallback به داده‌های محلی
+      const puzzleModule = await import('@/lib/dailyPuzzleData');
+      setDailyPuzzle(puzzleModule.dailyPuzzleData);
     }
     
   } catch (error) {
@@ -272,7 +264,7 @@ const loadDailyPuzzle = async () => {
   try {
     console.log('🔄 Loading game state for user:', userId);
     
-    const response = await fetch(`/api/game/state?userId=${userId}`);
+    const response = await fetch(`/api/games/crossword/history/state?userId=${userId}`);
     
     if (response.ok) {
       const gameState = await response.json();
@@ -649,7 +641,7 @@ const updateUserScoreInDB = async (userId, additionalScore, currentInstantScore,
       userId: currentUser?.id
     });
 
-    const response = await fetch('/api/game/update', {
+    const response = await fetch('/api/games/crossword/game/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -907,7 +899,7 @@ const checkGameCompletion = async () => {
       
       // 3. تکمیل بازی
       console.log('🏁 Marking game as completed...');
-      const completeResponse = await fetch('/api/game/complete', {
+      const completeResponse = await fetch('/api/games/crossword/game/complete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -961,7 +953,7 @@ const checkGameCompletion = async () => {
             
             console.log('🔍 Final today score from database:', finalTodayScore);
             
-            const historyResponse = await fetch('/api/game/save-history', {
+            const historyResponse = await fetch('/api/games/crossword/history/save', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
