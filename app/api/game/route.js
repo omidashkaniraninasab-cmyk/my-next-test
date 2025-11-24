@@ -1,16 +1,22 @@
 import { neon } from '@neondatabase/serverless';
-import { createNewGame, markGameStarted, incrementCompletedGames } from '@/lib/db';
+import { createNewGame, markGameStarted } from '@/lib/db';
 
 const sql = neon(process.env.DATABASE_URL);
 
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { action, userId, gameData, userProgress, gameId, score, mistakes } = body;
+    const { action, userId, gameData, userProgress, gameId } = body;
     
     console.log('🎮 Game API called:', { action, userId: userId ? String(userId).slice(0, 8) + '...' : 'none', gameId });
+    console.log('🔍 Request details:', {
+      hasGameData: !!gameData,
+      gameDataKeys: gameData ? Object.keys(gameData) : 'no gameData',
+      hasPuzzle: !!gameData?.puzzle,
+      puzzleKeys: gameData?.puzzle ? Object.keys(gameData.puzzle) : 'no puzzle'
+    });
 
-    // تبدیل userId به string برای اطمینان
+    // 🔥 تبدیل userId به string برای اطمینان
     const stringUserId = String(userId || '');
 
     if (!stringUserId || stringUserId === 'undefined' || stringUserId === 'null') {
@@ -21,6 +27,7 @@ export async function POST(request) {
     if (action === 'start') {
       console.log('🚀 Starting new game for user:', stringUserId);
       
+      // 🆕 اگر gameData نداریم، خطا برگردان
       if (!gameData) {
         console.log('❌ No gameData provided');
         return Response.json({ 
@@ -29,6 +36,7 @@ export async function POST(request) {
         }, { status: 400 });
       }
       
+      // 🆕 استفاده از gameData مستقیماً اگر puzzle نداریم
       const puzzleToUse = gameData.puzzle || gameData;
       
       if (!puzzleToUse) {
@@ -47,6 +55,7 @@ export async function POST(request) {
       });
 
       try {
+        // 🆕 ایجاد بازی با داده‌های کامل
         const game = await createNewGame(stringUserId, puzzleToUse);
         console.log('✅ Game creation successful:', { 
           gameId: game.id, 
@@ -83,6 +92,7 @@ export async function POST(request) {
       }
 
       try {
+        // 🆕 تبدیل gameId به number برای اطمینان
         const numericGameId = parseInt(gameId);
         if (isNaN(numericGameId)) {
           console.log('❌ Invalid gameId:', gameId);
@@ -115,100 +125,22 @@ export async function POST(request) {
           details: markError.message 
         }, { status: 500 });
       }
-      
-    } else if (action === 'complete') {
-      console.log('🏁 Game completion called:', { gameId, userId: stringUserId, score, mistakes });
-      
-      if (!gameId || !stringUserId) {
-        console.log('❌ Missing gameId or userId for completion');
-        return Response.json({ 
-          error: 'gameId و userId برای تکمیل بازی لازم است' 
-        }, { status: 400 });
-      }
-
-      try {
-        const numericGameId = parseInt(gameId);
-        if (isNaN(numericGameId)) {
-          console.log('❌ Invalid gameId for completion:', gameId);
-          return Response.json({ 
-            error: 'gameId نامعتبر است' 
-          }, { status: 400 });
-        }
-
-        // 🔥 تغییر: games -> crossword_games
-        const existingGame = await sql`
-          SELECT completed FROM crossword_games WHERE id = ${numericGameId}
-        `;
-        
-        if (existingGame.length > 0 && existingGame[0].completed) {
-          console.log('⚠️ Game already completed, skipping...');
-          return Response.json({ success: true, message: 'Game was already completed' });
-        }
-
-        // گرفتن user_code و display_name کاربر
-        const user = await sql`
-          SELECT user_code, display_name FROM user_profiles WHERE id = ${stringUserId}
-        `;
-        
-        const userCode = user[0]?.user_code;
-        const displayName = user[0]?.display_name;
-
-        console.log('🎯 User details for completion:', { userCode, displayName });
-
-        // 🔥 تغییر: games -> crossword_games
-        const updateResult = await sql`
-          UPDATE crossword_games 
-          SET 
-            completed = TRUE, 
-            completed_at = CURRENT_TIMESTAMP, 
-            finished_at = CURRENT_TIMESTAMP,
-            ${score !== undefined ? sql`score = ${score},` : sql``}
-            ${mistakes !== undefined ? sql`mistakes = ${mistakes},` : sql``}
-            user_code = ${userCode},
-            display_name = ${displayName}
-          WHERE id = ${numericGameId}
-          RETURNING id, completed, completed_at
-        `;
-
-        console.log('✅ Game completed with user details updated');
-
-        // افزایش بازی‌های کامل
-        await incrementCompletedGames(stringUserId);
-        console.log('✅ Completed games count incremented');
-
-        // آپدیت وضعیت کاربر
-        await sql`
-          UPDATE user_profiles 
-          SET today_game_completed = TRUE
-          WHERE id = ${stringUserId}
-        `;
-
-        console.log('✅ Game marked as completed');
-
-        return Response.json({ 
-          success: true,
-          message: 'Game completed successfully',
-          game: updateResult[0]
-        });
-        
-      } catch (completeError) {
-        console.error('❌ Error completing game:', completeError);
-        return Response.json({ 
-          error: 'Error completing game',
-          details: completeError.message 
-        }, { status: 500 });
-      }
-      
     } else {
       console.log('❌ Unknown action:', action);
       return Response.json({ 
         error: 'Action not found',
-        supportedActions: ['start', 'first-input', 'complete'] 
+        supportedActions: ['start', 'first-input'] 
       }, { status: 400 });
     }
     
   } catch (error) {
     console.error('❌ Game API error:', error);
+    console.error('🔍 Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
     return Response.json({ 
       error: 'Internal server error',
       message: error.message 

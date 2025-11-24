@@ -219,20 +219,28 @@ const fetchUserStatsImmediately = async (userId) => {
 const loadDailyPuzzle = async () => {
   try {
     setPuzzleLoading(true);
-    console.log('🎯 Loading monthly puzzle...');
+    console.log('🎯 Loading daily puzzle...');
     
-    // 🔥 فقط از monthly استفاده کن - دیگه fallback به daily نداشته باش
-    const monthlyResponse = await fetch('/api/games/crossword/puzzles/monthly');
+    // اول از monthly-puzzles سعی کن
+    const monthlyResponse = await fetch('/api/monthly-puzzles');
     
     if (monthlyResponse.ok) {
       const monthlyData = await monthlyResponse.json();
-      console.log('✅ Monthly puzzle loaded:', monthlyData.iran_date);
+      console.log('✅ Monthly puzzle loaded:', monthlyData.date);
       setDailyPuzzle(monthlyData.puzzle_data);
+    } else if (monthlyResponse.status === 404) {
+      // اگر پیدا نکرد، از سیستم قدیمی استفاده کن
+      console.log('📅 No monthly puzzle, using legacy system...');
+      const legacyResponse = await fetch('/api/daily-puzzle');
+      
+      if (legacyResponse.ok) {
+        const legacyData = await legacyResponse.json();
+        setDailyPuzzle(legacyData);
+      } else {
+        throw new Error('Failed to load puzzle');
+      }
     } else {
-      console.log('❌ Monthly puzzle not available');
-      // Fallback به داده‌های محلی
-      const puzzleModule = await import('@/lib/dailyPuzzleData');
-      setDailyPuzzle(puzzleModule.dailyPuzzleData);
+      throw new Error('Monthly puzzles API error');
     }
     
   } catch (error) {
@@ -264,7 +272,7 @@ const loadDailyPuzzle = async () => {
   try {
     console.log('🔄 Loading game state for user:', userId);
     
-    const response = await fetch(`/api/games/crossword/history/state?userId=${userId}`);
+    const response = await fetch(`/api/game/state?userId=${userId}`);
     
     if (response.ok) {
       const gameState = await response.json();
@@ -421,7 +429,7 @@ const startNewGame = async (userId) => {
     // 🔥 تبدیل userId به string برای اطمینان
     const stringUserId = String(userId);
 
-    const response = await fetch('/api/games/crossword', {
+    const response = await fetch('/api/game', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -641,7 +649,7 @@ const updateUserScoreInDB = async (userId, additionalScore, currentInstantScore,
       userId: currentUser?.id
     });
 
-    const response = await fetch('/api/games/crossword/game/update', {
+    const response = await fetch('/api/game/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -690,7 +698,7 @@ const handleInput = async (char) => {
   if (!firstInputSent) {
     console.log('🚀 Sending first-input request...');
     try {
-      const response = await fetch('/api/games/crossword', {
+      const response = await fetch('/api/game', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -774,7 +782,7 @@ console.log('💾 Calling saveGameStateToServer...');
     findNextUnlockedCell();
   }
 
- if (!gameCompleted) {
+  if (!gameCompleted && !completionCheckedRef.current) {
     console.log('🔍 Checking game completion after input...');
     checkGameCompletion();
   }
@@ -823,7 +831,7 @@ console.log('💾 Calling saveGameStateToServer...');
 
     checkGameCompletion();
   };
-
+const completionCheckedRef = useRef(false);
 // تابع checkGameCompletion - اصلاح شده
 // تابع checkGameCompletion - اصلاح شده
 // تابع checkGameCompletion - اصلاح شده با useRef
@@ -833,11 +841,11 @@ console.log('💾 Calling saveGameStateToServer...');
 // تابع checkGameCompletion - اصلاح شده با روش ساده
 // تابع checkGameCompletion - کامل شده با آپدیت last_game_date
 const checkGameCompletion = async () => {
-  // فقط gameCompleted رو چک کن
-  if (!dailyPuzzle || gameCompleted) {
+  if (!dailyPuzzle || gameCompleted || completionCheckedRef.current) {
     console.log('❌ Game completion check skipped:', {
       hasPuzzle: !!dailyPuzzle,
-      gameCompleted
+      gameCompleted,
+      alreadyChecked: completionCheckedRef.current
     });
     return;
   }
@@ -855,17 +863,18 @@ const checkGameCompletion = async () => {
   }
 
   if (allLocked) {
-    console.log('🎯 Game completed! Starting completion process...');
+    console.log('🎯 Game completed! Setting completion state...');
     
-    // فوراً gameCompleted رو true کن
+    completionCheckedRef.current = true;
     setGameCompleted(true);
     setTodayGameCompleted(true);
     setInstantScore(0);
     
     const bonusScore = 50;
 
-    console.log('🔍 DEBUG - Game completion started:', {
+    console.log('🔍 DEBUG - Adding bonus score:', {
       currentUser: currentUser?.id,
+      currentTodayScore: currentUser?.today_crossword_score,
       bonusScore: bonusScore
     });
 
@@ -886,6 +895,8 @@ const checkGameCompletion = async () => {
       });
 
       if (!scoreResponse.ok) {
+        const errorText = await scoreResponse.text();
+        console.error('❌ Score update failed:', errorText);
         throw new Error('Failed to add bonus score');
       }
 
@@ -896,17 +907,15 @@ const checkGameCompletion = async () => {
       
       // 3. تکمیل بازی
       console.log('🏁 Marking game as completed...');
-      const completeResponse = await fetch('/api/games/crossword', {
+      const completeResponse = await fetch('/api/game/complete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'complete',
           gameId: currentGameId,
-          userId: currentUser.id,
-          score: currentUser.today_crossword_score + bonusScore,
-          mistakes: mistakes
+          finalScore: currentUser.today_crossword_score + bonusScore,
+          userId: currentUser.id
         }),
       });
 
@@ -919,7 +928,7 @@ const checkGameCompletion = async () => {
       // 4. XP
       console.log('⭐ Adding XP for game completion...');
       try {
-        await fetch('/api/user/level', {
+        const xpResponse = await fetch('/api/user/level', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -928,13 +937,19 @@ const checkGameCompletion = async () => {
             reason: 'اتمام بازی کراسورد'
           })
         });
-        console.log('✅ XP added successfully');
+        
+        if (!xpResponse.ok) {
+          console.warn('⚠️ XP API returned non-200 status:', xpResponse.status);
+        } else {
+          console.log('✅ XP added successfully');
+        }
       } catch (xpError) {
-        console.warn('⚠️ XP addition failed:', xpError.message);
+        console.warn('⚠️ XP addition failed, but continuing:', xpError.message);
       }
 
-      // 5. ذخیره تاریخچه
+      // 5. ذخیره تاریخچه - با هندلینگ خطا
       console.log('💾 Saving game to history...');
+      
       try {
         const usersResponse = await fetch('/api/users');
         if (usersResponse.ok) {
@@ -944,7 +959,9 @@ const checkGameCompletion = async () => {
           if (updatedUser) {
             const finalTodayScore = updatedUser.today_crossword_score;
             
-            await fetch('/api/games/crossword/history/save', {
+            console.log('🔍 Final today score from database:', finalTodayScore);
+            
+            const historyResponse = await fetch('/api/game/save-history', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -957,11 +974,26 @@ const checkGameCompletion = async () => {
                 todayScore: finalTodayScore
               }),
             });
-            console.log('✅ History saved with final score:', finalTodayScore);
+
+            if (historyResponse.ok) {
+              console.log('✅ History saved with final score:', finalTodayScore);
+            } else {
+              console.warn('⚠️ History save returned non-200 status:', historyResponse.status);
+              // تلاش برای گرفتن پیام خطا
+              try {
+                const errorData = await historyResponse.json();
+                console.warn('⚠️ History save error details:', errorData);
+              } catch (e) {
+                console.warn('⚠️ Could not parse history error response');
+              }
+            }
           }
+        } else {
+          console.warn('⚠️ Could not fetch users for history');
         }
       } catch (historyError) {
-        console.warn('⚠️ History save failed:', historyError.message);
+        console.warn('⚠️ History save failed, but continuing:', historyError.message);
+        // ادامه بده حتی اگر تاریخچه ذخیره نشد
       }
 
       // 6. آپدیت نهایی وضعیت
@@ -970,19 +1002,13 @@ const checkGameCompletion = async () => {
       setGameHistoryKey(prev => prev + 1);
       
       console.log('🎉 Game completion process finished!');
-      
-      // نمایش پیام تبریک
-      setTimeout(() => {
-        alert(`🎉 بازی تکمیل شد! \nامتیاز نهایی شما: ${currentUser.today_crossword_score + bonusScore} \nپاداش کامل کردن: +${bonusScore} امتیاز`);
-      }, 500);
 
     } catch (error) {
       console.error('❌ Critical error in game completion process:', error);
-      // در صورت خطا، gameCompleted رو reset کن
-      setGameCompleted(false);
-      setTodayGameCompleted(false);
+      completionCheckedRef.current = false;
       
-      alert('خطایی در تکمیل بازی رخ داد. لطفاً صفحه رو رفرش کنید و دوباره تلاش کنید.');
+      // نمایش پیام به کاربر
+      alert('خطایی در تکمیل بازی رخ داد. بازی تکمیل شده اما ممکن است برخی اطلاعات ذخیره نشده باشند.');
     }
   }
 };
