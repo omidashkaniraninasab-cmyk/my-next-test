@@ -421,7 +421,7 @@ const startNewGame = async (userId) => {
     // 🔥 تبدیل userId به string برای اطمینان
     const stringUserId = String(userId);
 
-    const response = await fetch('/api/game', {
+    const response = await fetch('/api/games/crossword', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -690,7 +690,7 @@ const handleInput = async (char) => {
   if (!firstInputSent) {
     console.log('🚀 Sending first-input request...');
     try {
-      const response = await fetch('/api/game', {
+      const response = await fetch('/api/games/crossword', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
